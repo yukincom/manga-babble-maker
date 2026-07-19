@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "manga-babble": {
+      "command": "/Users/yukin_co/manga-babble-maker/.venv/bin/python",
+      "args": ["-m", "manga_babble.mcp_server"],
+      "cwd": "/Users/yukin_co/manga-babble-maker",
+      "env": {
+        "PYTHONPATH": "/Users/yukin_co/manga-babble-maker"
+      }
+    }
+  }
+}

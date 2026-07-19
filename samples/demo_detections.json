@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "page": {
+    "image_path": null,
+    "width": 1000,
+    "height": 1400
+  },
+  "detections": {
+    "frames": [
+      {
+        "id": "f0",
+        "bbox": [20, 20, 980, 1380],
+        "score": 0.99
+      }
+    ],
+    "bodies": [
+      {
+        "id": "b0",
+        "bbox": [100, 600, 400, 1400],
+        "score": 0.9,
+        "frame_id": "f0"
+      },
+      {
+        "id": "b1",
+        "bbox": [600, 700, 950, 1400],
+        "score": 0.9,
+        "frame_id": "f0"
+      }
+    ],
+    "faces": [
+      {
+        "id": "face0",
+        "bbox": [150, 600, 300, 750],
+        "score": 0.88,
+        "frame_id": "f0",
+        "speaker": "char_a"
+      },
+      {
+        "id": "face1",
+        "bbox": [680, 700, 820, 830],
+        "score": 0.87,
+        "frame_id": "f0",
+        "speaker": "char_b"
+      }
+    ],
+    "texts": []
+  },
+  "model": {
+    "name": "sample_fixed",
+    "path": null,
+    "conf_threshold": 0.5
+  }
+}

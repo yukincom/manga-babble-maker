@@ -6,5 +6,8 @@ Pillow>=10,<12
 # Detection (RT-DETRv4-X Manga109-s v2 ONNX)
 onnxruntime>=1.17,<2
 
-# Optional helpers
-# huggingface_hub>=0.20  # only if using `huggingface-cli download`
+# Dev / test
+pytest>=8,<9
+
+# MCP server for agents (Hermes, Claude Desktop, Cursor, etc.)
+mcp>=1.0

@@ -55,6 +55,7 @@ models/**/*.bin
 outputs/
 output/
 out/
+samples/blank_page.png
 *.log
 
 # Local demo artifacts (regenerable)

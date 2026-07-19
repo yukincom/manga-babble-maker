@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "page": {
+    "width": 1000,
+    "height": 1400
+  },
+  "lines": [
+    {
+      "id": "l1",
+      "text": "なんだと！？",
+      "order": 0,
+      "speaker": "char_a",
+      "type": null
+    },
+    {
+      "id": "l2",
+      "text": "ふざけるな！！",
+      "order": 1,
+      "speaker": "char_b",
+      "type": null
+    },
+    {
+      "id": "l3",
+      "text": "（……そうか）",
+      "order": 2,
+      "speaker": "char_a",
+      "type": null
+    }
+  ],
+  "options": {
+    "style": "default",
+    "seed": 0
+  }
+}

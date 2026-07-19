@@ -349,23 +349,23 @@ CLI と 1:1。ロジックは `manga_babble.pipeline` のみ。
 - [x] Agent.md 方針
 - [x] git / gitignore / requirements / venv
 - [x] モデル DL 手順とローカル配置
-- [ ] フェーズ A（JSON・samples・package 骨格）
+- [x] フェーズ A（JSON・samples・package 骨格）
 
 ### P1
 
-- [ ] tone 規則
-- [ ] place（文字量・話者最小）
-- [ ] raster bubble / text 分離
-- [ ] layout.json に text/tone/bbox
-- [ ] detect ONNX
-- [ ] CLI 非対話 + manifest
-- [ ] offline E2E
-- [ ] 最低限テスト + README
+- [x] tone 規則
+- [x] place（文字量・話者最小）
+- [x] raster bubble / text 分離
+- [x] layout.json に text/tone/bbox
+- [x] detect ONNX
+- [x] CLI 非対話 + manifest
+- [x] offline E2E（固定 detections + ローカル ONNX ロード）
+- [x] 最低限テスト + README
 
 ### P2
 
-- [ ] MCP
-- [ ] エージェントからの接続確認
+- [x] MCP（薄いラッパ）
+- [ ] エージェントからの接続確認（利用側）
 - [ ] （任意開始）読み順・作品傾向
 
 ---
