@@ -1,4 +1,11 @@
-"""Raster speech-bubble layer (frame + tail only, no text)."""
+"""Raster speech-bubble layer (frame + tail only, no text).
+
+Sprint-now shapes (generic only; user templates for cloud/soft burst later):
+  normal / whisper : ellipse (+ short triangle tail; whisper dashed)
+  shout            : hard modest jagged, NO triangle tail
+  narration / note : rectangle, no tail
+  thought          : temporary ellipse + dots (cloud templates later)
+"""
 
 from __future__ import annotations
 
@@ -21,24 +28,19 @@ def _ellipse_pts(cx, cy, rx, ry, seed=0, n=48):
     ]
 
 
-def _jagged_pts(cx, cy, rx, ry, seed=0, spikes=14, jitter=0.35):
+def _hard_jagged_pts(cx, cy, rx, ry, seed=0, spikes=8, indent=0.22):
+    """
+    Hard (polygonal) jagged: angular ellipse + modest spikes.
+    Not an explosion mark — few spikes, moderate indent, tiny noise.
+    """
     rnd = random.Random(seed)
     pts = []
     for i in range(spikes * 2):
         t = math.pi * i / spikes
-        base_r = 1.0 if i % 2 == 0 else (1 - jitter)
-        r = base_r * (1 + rnd.uniform(-0.08, 0.08))
+        # outer tip / inner valley
+        base_r = 1.0 if i % 2 == 0 else (1.0 - indent)
+        r = base_r * (1 + rnd.uniform(-0.03, 0.03))
         pts.append((cx + rx * r * math.cos(t), cy + ry * r * math.sin(t)))
-    return pts
-
-
-def _cloud_pts(cx, cy, rx, ry, seed=0, bumps=10, n=96):
-    rnd = random.Random(seed)
-    pts = []
-    for i in range(n):
-        t = 2 * math.pi * i / n
-        bump = 1 + 0.12 * math.sin(bumps * t) + rnd.uniform(-0.015, 0.015)
-        pts.append((cx + rx * bump * math.cos(t), cy + ry * bump * math.sin(t)))
     return pts
 
 
@@ -47,13 +49,27 @@ def _nearest_point_on_bbox(px, py, bbox):
     return min(max(px, x1), x2), min(max(py, y1), y2)
 
 
+def _clamp_tail_target(cx, cy, rx, ry, target, max_len_ratio=0.45):
+    """Shorten tail tip so it does not spear across the page."""
+    tx, ty = target
+    dx, dy = tx - cx, ty - cy
+    dist = math.hypot(dx, dy) or 1.0
+    # Start from ellipse edge
+    edge = max(rx, ry) * 0.85
+    max_len = max(rx, ry) * 2 * max_len_ratio
+    if dist <= edge + 4:
+        return tx, ty
+    # Point at most max_len beyond the bubble center toward target
+    scale = min(1.0, (edge + max_len) / dist)
+    return cx + dx * scale, cy + dy * scale
+
+
 def _draw_polygon(draw: ImageDraw.ImageDraw, pts, fill, outline, width, dashed=False):
     if len(pts) < 3:
         return
     ip = [(int(round(x)), int(round(y))) for x, y in pts]
     draw.polygon(ip, fill=fill, outline=outline)
     if dashed:
-        # Approximate dash by overdrawing white gaps on outline
         for i in range(len(ip)):
             p0, p1 = ip[i], ip[(i + 1) % len(ip)]
             if i % 2 == 0:
@@ -73,8 +89,10 @@ def _draw_one(
     cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
     rx, ry = max(1.0, (x2 - x1) / 2), max(1.0, (y2 - y1) / 2)
     face = bubble.get("speaker_face_bbox")
+    placement = (bubble.get("meta") or {}).get("placement") or ""
 
-    if tone == "narration":
+    # Rectangle: narration and page-margin notes
+    if tone in ("narration", "note") or placement == "page_margin":
         draw.rectangle(
             [int(x1), int(y1), int(x2), int(y2)],
             fill=(255, 255, 255, 255),
@@ -84,10 +102,9 @@ def _draw_one(
         return
 
     if tone == "shout":
-        pts = _jagged_pts(cx, cy, rx, ry, seed=seed)
-    elif tone == "thought":
-        pts = _cloud_pts(cx, cy, rx, ry, seed=seed)
+        pts = _hard_jagged_pts(cx, cy, rx, ry, seed=seed)
     else:
+        # normal, whisper, thought body (thought cloud templates later)
         pts = _ellipse_pts(cx, cy, rx, ry, seed=seed)
 
     dashed = tone == "whisper"
@@ -100,42 +117,47 @@ def _draw_one(
         dashed=dashed,
     )
 
-    if face is None:
+    # shout: no triangle tail (shape alone; user soft-burst templates later)
+    if tone == "shout" or face is None:
         return
+
     fx1, fy1, fx2, fy2 = normalize_bbox(face)
     aim = (fx1, fy1, fx2, fy2 + (fy2 - fy1) * 0.3)
     target = _nearest_point_on_bbox(cx, cy, aim)
+    target = _clamp_tail_target(cx, cy, rx, ry, target)
 
     if tone == "thought":
-        for i, frac in enumerate((0.32, 0.56, 0.78)):
+        for i, frac in enumerate((0.35, 0.58, 0.78)):
             bx = cx + (target[0] - cx) * frac
             by = cy + (target[1] - cy) * frac
-            r = max(3, 11 - i * 3)
+            r = max(3, 10 - i * 3)
             draw.ellipse(
                 [bx - r, by - r, bx + r, by + r],
                 fill=(255, 255, 255, 255),
                 outline=(0, 0, 0, 255),
                 width=max(1, stroke - 1),
             )
-    else:
-        angle = math.atan2(target[1] - cy, target[0] - cx)
-        base_x = cx + rx * math.cos(angle)
-        base_y = cy + ry * math.sin(angle)
-        perp = angle + math.pi / 2
-        tw = 18
-        dx, dy = math.cos(perp) * tw / 2, math.sin(perp) * tw / 2
-        tri = [
-            (base_x + dx, base_y + dy),
-            (base_x - dx, base_y - dy),
-            (target[0], target[1]),
-        ]
-        _draw_polygon(
-            draw,
-            tri,
-            fill=(255, 255, 255, 255),
-            outline=(0, 0, 0, 255),
-            width=stroke,
-        )
+        return
+
+    # normal / whisper: short triangle tail
+    angle = math.atan2(target[1] - cy, target[0] - cx)
+    base_x = cx + rx * 0.92 * math.cos(angle)
+    base_y = cy + ry * 0.92 * math.sin(angle)
+    perp = angle + math.pi / 2
+    tw = min(16, max(8, min(rx, ry) * 0.25))
+    dx, dy = math.cos(perp) * tw / 2, math.sin(perp) * tw / 2
+    tri = [
+        (base_x + dx, base_y + dy),
+        (base_x - dx, base_y - dy),
+        (target[0], target[1]),
+    ]
+    _draw_polygon(
+        draw,
+        tri,
+        fill=(255, 255, 255, 255),
+        outline=(0, 0, 0, 255),
+        width=stroke,
+    )
 
 
 def draw_bubble_layer(
