@@ -25,3 +25,25 @@ def test_place_and_render(tmp_path):
     assert Path(manifest["files"]["layout_json"]).is_file()
     # Text data present for downstream tools
     assert all(b.get("text") for b in manifest["bubbles"])
+
+
+def test_page_margin_note():
+    det = load_json(SAMPLES / "demo_detections.json")
+    lines = {
+        "schema_version": 1,
+        "page": {"width": 1000, "height": 1400},
+        "lines": [
+            {
+                "id": "n1",
+                "text": "※ロゴは実際のものと異なります",
+                "order": 0,
+            }
+        ],
+    }
+    layout = run_place(det, lines, seed=0)
+    b = layout["bubbles"][0]
+    assert b["tone"] == "narration"
+    assert b["meta"].get("placement") == "page_margin"
+    assert b["frame_id"] is None
+    # Prefer left side of page for demo frames that start at x=20
+    assert b["bubble_bbox"][0] < 200
