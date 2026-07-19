@@ -41,7 +41,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.code-workspace
-/samples
 
 # Model weights (download separately; large binaries)
 models/**/*.onnx

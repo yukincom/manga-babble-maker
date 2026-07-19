@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "page": {
+    "image_path": "samples/real/page.jpg",
+    "width": 1306,
+    "height": 1843
+  },
+  "lines": [
+    {
+      "id": "l1",
+      "text": "やっと正月だー！",
+      "order": 0,
+      "speaker": "face1",
+      "type": "shout",
+      "frame_id": "f2"
+    },
+    {
+      "id": "l2",
+      "text": "2025年",
+      "order": 1,
+      "speaker": null,
+      "type": "narration",
+      "frame_id": "f2"
+    },
+    {
+      "id": "l3",
+      "text": "たまにはツイッター",
+      "order": 2,
+      "speaker": "face1",
+      "type": "normal",
+      "frame_id": "f1"
+    },
+    {
+      "id": "l4",
+      "text": "今はXだっけ",
+      "order": 3,
+      "speaker": "face2",
+      "type": "thought",
+      "frame_id": "f1"
+    },
+    {
+      "id": "l5",
+      "text": "ん？",
+      "order": 4,
+      "speaker": "face0",
+      "type": "normal",
+      "frame_id": "f0"
+    },
+    {
+      "id": "l6",
+      "text": "なんだこれ",
+      "order": 5,
+      "speaker": "face0",
+      "type": "normal",
+      "frame_id": "f0"
+    },
+    {
+      "id": "l7",
+      "text": "見慣れぬアイコン・・・",
+      "order": 6,
+      "speaker": "face0",
+      "type": "thought",
+      "frame_id": "f0"
+    },
+    {
+      "id": "l8",
+      "text": "※ロゴは実際のものと異なります",
+      "order": 7,
+      "speaker": null,
+      "type": null
+    }
+  ],
+  "options": {
+    "style": "default",
+    "seed": 0
+  }
+}
