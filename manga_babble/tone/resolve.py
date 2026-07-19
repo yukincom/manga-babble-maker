@@ -17,13 +17,32 @@ _ALIASES = {
     "narrate": "narration",
     "narr": "narration",
     "box": "narration",
+    "note": "narration",
 }
+
+
+def is_page_margin_line(line: dict[str, Any]) -> bool:
+    """※ notes or explicit placement → outside panel."""
+    meta = line.get("meta") or {}
+    if meta.get("placement") in ("page_margin", "outside", "outside_frame"):
+        return True
+    if line.get("placement") in ("page_margin", "outside", "outside_frame"):
+        return True
+    text = str(line.get("text") or "").strip()
+    if text.startswith("※") or text.startswith("*"):
+        return True
+    return False
 
 
 def resolve_tone(line: dict[str, Any]) -> tuple[str, str]:
     """
     Returns (tone, source) where source is explicit | rule | default.
     """
+    if is_page_margin_line(line) and not (
+        line.get("type") and str(line.get("type")).strip()
+    ):
+        return "narration", "rule"
+
     raw = line.get("type")
     if raw is not None and str(raw).strip() != "":
         t = str(raw).strip().lower()
@@ -44,6 +63,9 @@ def _from_text(text: str) -> str | None:
     if not s:
         return None
 
+    if s.startswith("※") or s.startswith("*"):
+        return "narration"
+
     # Full-width / half-width parens often mark thought / aside
     if (s.startswith("（") and s.endswith("）")) or (
         s.startswith("(") and s.endswith(")")
@@ -56,14 +78,13 @@ def _from_text(text: str) -> str | None:
     if re.match(r"^[【\[]", s) and re.search(r"[】\]]$", s):
         return "narration"
 
-    # Whisper-ish: many ellipses / small voice markers, no bang
+    # Whisper-ish
     if "（小声）" in s or "（囁" in s or "(whisper)" in s.lower():
         return "whisper"
 
     bangs = s.count("！") + s.count("!")
-    if bangs >= 1 and ("？" not in s[:2] and "?" not in s[:2]):
-        # Strong shout if multiple bangs or short intense line
-        if bangs >= 2 or len(s) <= 12:
-            return "shout"
+    # Soft single bang stays normal; strong shout needs !! or more
+    if bangs >= 2:
+        return "shout"
 
     return None

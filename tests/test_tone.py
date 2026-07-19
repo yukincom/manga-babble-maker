@@ -13,11 +13,26 @@ def test_rule_thought_parens():
     assert src == "rule"
 
 
-def test_rule_shout():
-    tone, src = resolve_tone({"text": "なんだと！？"})
-    # has bang → shout
+def test_rule_shout_double_bang():
+    tone, src = resolve_tone({"text": "ふざけるな！！"})
     assert tone == "shout"
     assert src == "rule"
+
+
+def test_single_bang_stays_normal():
+    tone, src = resolve_tone({"text": "なんだと！？"})
+    # single ！ → not shout (soft)
+    assert tone == "normal"
+    assert src == "default"
+
+
+def test_note_margin():
+    from manga_babble.tone.resolve import is_page_margin_line
+
+    line = {"text": "※ロゴは実際のものと異なります"}
+    assert is_page_margin_line(line)
+    tone, src = resolve_tone(line)
+    assert tone == "narration"
 
 
 def test_default():
