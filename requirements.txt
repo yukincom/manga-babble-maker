@@ -1,0 +1,10 @@
+# Core (placement + raster preview)
+numpy>=1.26,<3
+opencv-python-headless>=4.8,<5
+Pillow>=10,<12
+
+# Detection (RT-DETRv4-X Manga109-s v2 ONNX)
+onnxruntime>=1.17,<2
+
+# Optional helpers
+# huggingface_hub>=0.20  # only if using `huggingface-cli download`
