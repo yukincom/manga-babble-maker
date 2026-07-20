@@ -3,72 +3,99 @@
   "page": {
     "image_path": "samples/real/page.jpg",
     "width": 1306,
-    "height": 1843
+    "height": 1843,
+    "id": "page1"
   },
   "lines": [
     {
       "id": "l0",
-      "text": "やっと正月だー！",
+      "text": "やっと　正月だー！",
       "order": 0,
+      "type": "fun-cloud",
       "speaker": "小雪",
-      "type": "giza",
-      "panel_index": 1
+      "panel_index": 1,
+      "meta": {
+        "panel_order": 0
+      }
     },
     {
       "id": "l1",
       "text": "2025年",
       "order": 1,
-      "speaker": null,
       "type": "narration",
-      "panel_index": 1
+      "speaker": null,
+      "panel_index": 1,
+      "meta": {
+        "panel_order": 1
+      }
     },
     {
       "id": "l2",
-      "text": "たまにはツイッター…",
+      "text": "たまには　ツイッター…",
       "order": 2,
-      "speaker": "小雪",
       "type": "normal",
-      "panel_index": 2
+      "speaker": "小雪",
+      "panel_index": 2,
+      "meta": {
+        "panel_order": 0
+      }
     },
     {
       "id": "l3",
-      "text": "今はXだっけ",
+      "text": "今は　Xだっけ",
       "order": 3,
-      "speaker": "小雪",
       "type": "normal",
-      "panel_index": 2
+      "speaker": "小雪",
+      "panel_index": 2,
+      "meta": {
+        "panel_order": 1
+      }
     },
     {
       "id": "l4",
       "text": "ん？",
       "order": 4,
-      "speaker": "小雪",
       "type": "normal",
-      "panel_index": 3
+      "speaker": "小雪",
+      "panel_index": 3,
+      "meta": {
+        "panel_order": 0
+      }
     },
     {
       "id": "l5",
-      "text": "なんだこれ",
+      "text": "なんだ　これ",
       "order": 5,
+      "type": "shout",
       "speaker": "小雪",
-      "type": "normal",
-      "panel_index": 3
+      "panel_index": 3,
+      "meta": {
+        "panel_order": 1
+      }
     },
     {
       "id": "l6",
-      "text": "見慣れぬアイコン・・・",
+      "text": "見慣れぬ　アイコン・・・",
       "order": 6,
-      "speaker": "小雪",
       "type": "normal",
-      "panel_index": 4
+      "speaker": "小雪",
+      "panel_index": 4,
+      "meta": {
+        "panel_order": 0
+      }
     },
     {
       "id": "l7",
       "text": "※ロゴは実際のものと異なります",
       "order": 7,
       "type": "narration",
-      "meta": { "placement": "page_margin" }
+      "meta": {
+        "placement": "page_margin"
+      }
     }
   ],
-  "options": { "style": "default", "seed": 0 }
+  "options": {
+    "style": "default",
+    "seed": 0
+  }
 }

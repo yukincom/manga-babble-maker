@@ -21,9 +21,13 @@ from manga_babble.text.profile import BreakProfile, resolve_break_profile
 # 　 = editorial space, / = explicit break token, newlines
 _EXPLICIT_SPLIT = re.compile(r"(?:[\u3000\u00a0]+|/+|\n+|\r+)")
 
-_KATAKANA = re.compile(r"[\u30a0-\u30ffー]")
-_HIRAGANA = re.compile(r"[\u3040-\u309fー]")
+# Note: long vowel ー (U+30FC) is NOT treated as katakana for script-boundary splits
+_KATAKANA = re.compile(r"[\u30a1-\u30fa\u30fd\u30fe]")  # ァ-ヺ ヽヾ (no ー)
+_HIRAGANA = re.compile(r"[\u3041-\u3096\u309d\u309e]")
 _KANJI = re.compile(r"[\u4e00-\u9fff]")
+# Attach to previous char / never start a column alone
+_ATTACH_LEAD = re.compile(r"^[ーｰ−‐–—〜～！？!?。、．，…‥・]+")
+_LONG_VOWEL = set("ーｰ−‐–—")
 
 # Closed small set — structural only, not open-ended connectives
 _DEMONSTRATIVE_HEAD = re.compile(
@@ -87,13 +91,34 @@ def _light_structural(text: str) -> list[str]:
 
 
 def _split_kana_to_katakana(s: str) -> str:
+    """Insert boundary when script switches to katakana — never before ー."""
     out: list[str] = []
     for i, ch in enumerate(s):
+        if ch in _LONG_VOWEL:
+            out.append(ch)
+            continue
         if i > 0 and _KATAKANA.match(ch) and not _KATAKANA.match(s[i - 1]):
-            if _HIRAGANA.match(s[i - 1]) or _KANJI.match(s[i - 1]):
+            prev = s[i - 1]
+            if prev in _LONG_VOWEL:
+                out.append(ch)
+                continue
+            if _HIRAGANA.match(prev) or _KANJI.match(prev):
                 out.append("\x1e")
         out.append(ch)
     return "".join(out)
+
+
+def _reattach_orphans(parts: list[str]) -> list[str]:
+    """Merge chunks that only start with long-vowel/punct into previous chunk."""
+    if not parts:
+        return parts
+    merged: list[str] = [parts[0]]
+    for p in parts[1:]:
+        if _ATTACH_LEAD.match(p) or (p and all(c in _LONG_VOWEL or c in "！？!?。、．，…‥・" for c in p)):
+            merged[-1] = merged[-1] + p
+        else:
+            merged.append(p)
+    return merged
 
 
 def _safety(
@@ -102,12 +127,14 @@ def _safety(
     *,
     allow_midword: bool,
 ) -> list[str]:
+    parts = _reattach_orphans([p for p in parts if p])
     result: list[str] = []
     for p in parts:
         if len(p) <= max_chars:
             result.append(p)
             continue
         soft = _light_structural(p)
+        soft = _reattach_orphans(soft)
         if len(soft) > 1:
             result.extend(_safety(soft, max_chars, allow_midword=allow_midword))
             continue
@@ -117,4 +144,4 @@ def _safety(
         else:
             # Keep intact rather than shred particles
             result.append(p)
-    return result or parts
+    return _reattach_orphans(result or parts)

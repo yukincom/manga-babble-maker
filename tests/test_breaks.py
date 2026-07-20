@@ -37,3 +37,18 @@ def test_profile_speakers_generic():
         speaker="話者A",
     )
     assert p.voice == "dense"
+
+
+def test_long_vowel_not_orphan_column():
+    """#27: だー！ must not become ['…だ', 'ー！']."""
+    chunks = split_text_to_chunks("やっと正月だー！")
+    assert not any(c.startswith("ー") for c in chunks)
+    assert any("だー" in c or "だー！" in c for c in chunks)
+
+
+def test_twitter_long_vowel_stays_in_word():
+    chunks = split_text_to_chunks("たまにはツイッター…")
+    joined = "".join(chunks)
+    assert "ツイッター" in joined
+    # ー should not be its own chunk
+    assert "ー" not in chunks

@@ -8,7 +8,10 @@ from typing import Any
 from manga_babble import SCHEMA_VERSION
 
 _PAGE_RE = re.compile(r"^page\s*(\d+)\s*$", re.I)
-_PANEL_RE = re.compile(r"^\[\s*([0-9０-９]+|枠外)\s*\]\s*$")
+# [1] / [枠外] / [4][枠外]（コマ付き注釈）
+_PANEL_RE = re.compile(
+    r"^\[\s*([0-9０-９]+|枠外)\s*\](?:\s*\[\s*(枠外)\s*\])?\s*$"
+)
 _LINE_RE = re.compile(
     r'^(?P<speaker>\S+)\s+"(?P<text>(?:\\.|[^"\\])*)"\s*(?P<shape>\S+)?\s*$'
 )
@@ -45,9 +48,14 @@ def parse_script(text: str) -> dict[str, Any]:
         m = _PANEL_RE.match(line)
         if m:
             tag = m.group(1)
-            if tag == "枠外":
+            margin_suffix = m.group(2)  # second [枠外] if present
+            if tag == "枠外" or margin_suffix == "枠外":
                 in_margin = True
-                panel_index = None
+                # [4][枠外] keeps association with panel 4 when useful later
+                if tag != "枠外":
+                    panel_index = _norm_num(tag)
+                else:
+                    panel_index = None
             else:
                 in_margin = False
                 panel_index = _norm_num(tag)

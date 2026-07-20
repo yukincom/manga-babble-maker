@@ -145,32 +145,36 @@ def size_from_text(
     *,
     shape: str = "ellipse",
     num_chunks: int | None = None,
+    max_rows: int | None = None,
+    chunks: list[str] | None = None,
 ) -> tuple[float, float, float, float]:
     """
     Preferred half sizes from character count (vertical-friendly).
 
-    Important: ellipse roundness must NOT force extra text columns/line-breaks.
-    (That would over-break "read-heavy" manga.) Roundness is achieved by
-    **widening the balloon** (horizontal padding) when the text stack is tall,
-    while row/column count follows actual break chunks when provided.
+    Prefer passing ``chunks`` from ``split_text_to_chunks`` so place sizing
+    matches render columns (cols = len(chunks), rows = max chunk length).
 
-    - ~1 character margin each side
-    - MIN_FONT_PX floor
-    - num_chunks: if known (from explicit / breaks), use as column count
+    Ellipse roundness may widen slightly, but is **capped** so balloons do not
+    become empty horizontal ovals when text is only 1–2 columns.
     """
-    # Ignore break markers for raw length; count chunks if markers present
-    t = str(text)
-    if num_chunks is None:
-        # Explicit agent breaks only — do not invent multi-column for sizing
-        if "　" in t or "/" in t or "\n" in t:
-            import re
+    import re
 
+    t = str(text)
+    if chunks is not None and len(chunks) > 0:
+        parts = [str(c) for c in chunks if str(c).strip()]
+        num_chunks = max(1, len(parts))
+        max_rows = max((len(p) for p in parts), default=1)
+        raw = "".join(parts)
+    elif num_chunks is None:
+        if "　" in t or "/" in t or "\n" in t:
             parts = [p for p in re.split(r"[\u3000/\n\r]+", t) if p.strip()]
             num_chunks = max(1, len(parts))
+            max_rows = max((len(p) for p in parts), default=1)
             raw = "".join(parts)
         else:
             num_chunks = 1
-            raw = t.replace(" ", "")
+            raw = t.replace(" ", "").replace("　", "").replace("/", "")
+            max_rows = max(1, len(raw))
     else:
         raw = (
             t.replace("\n", "")
@@ -178,16 +182,21 @@ def size_from_text(
             .replace("/", "")
             .replace(" ", "")
         )
+        if max_rows is None:
+            max_rows = max(1, (len(raw) + int(num_chunks) - 1) // max(1, int(num_chunks)))
+
     n = max(1, len(raw))
-    cols = max(1, int(num_chunks))
-    # Height follows longest column if even split of n over cols
-    rows = max(1, (n + cols - 1) // cols)
+    cols = max(1, int(num_chunks or 1))
+    rows = max(1, int(max_rows or ((n + cols - 1) // cols)))
 
     char_px = max(MIN_FONT_PX, min(28.0, page_h / 50.0))
     margin = char_px * 1.0
 
-    min_half_w = (cols * char_px + 2 * margin) / 2
-    min_half_h = (rows * char_px + 2 * margin) / 2
+    # Content box from actual columns × longest column
+    content_w = cols * char_px + 2 * margin
+    content_h = rows * char_px + 2 * margin
+    min_half_w = content_w / 2
+    min_half_h = content_h / 2
 
     shape = (shape or "ellipse").replace("_", "-")
     is_round_ellipse = shape in (
@@ -199,19 +208,25 @@ def size_from_text(
     )
 
     if is_round_ellipse:
-        # Widen (or slightly shorten ratio) without adding text columns.
-        # Tall text stack → fatter oval with empty side padding; text stays
-        # as few columns as breaks dictate (often 1).
-        full_w = min_half_w * 2
-        full_h = min_half_h * 2
-        # Target aspect h/w ≈ 1.0–1.2 (classic round-ish balloon)
-        if full_h > full_w * 1.2:
-            full_w = full_h / 1.1  # widen only
-        if n <= 4:
-            side = max(full_w, full_h)
-            full_w = side * 0.98
-            full_h = side * 1.0
+        full_w, full_h = content_w, content_h
+        # Mild roundness: allow some side pad, but never explode width.
+        # Cap: min(height-based target, 1.45× content width, content + 3ch)
+        if full_h > full_w * 1.15:
+            target = full_h / 1.2
+            cap = min(content_w * 1.45, content_w + 3 * char_px)
+            full_w = min(max(full_w, target), cap)
+        if n <= 4 and cols <= 1:
+            # Short single-column: near-circle, but still content-based floor
+            side = max(full_w, full_h * 0.92)
+            full_w = min(side, content_w * 1.5 + char_px)
+            full_h = max(full_h, side * 0.95)
         min_half_w, min_half_h = full_w / 2, full_h / 2
+    elif shape in ("jagged", "giza"):
+        full_w, full_h = content_w, content_h
+        side = max(full_w, full_h) * 1.05
+        # Keep shout near-square but not thinner than content
+        min_half_w = max(min_half_w, min(side, content_w * 1.3) / 2)
+        min_half_h = max(min_half_h, side / 2)
 
     max_half_w = page_w * 0.35
     max_half_h = page_h * 0.28

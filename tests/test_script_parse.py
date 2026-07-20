@@ -26,3 +26,21 @@ page1
 def test_zenkaku_panel():
     doc = parse_script('[１]\n小雪 "あ" normal\n')
     assert doc["lines"][0]["panel_index"] == 1
+
+
+def test_panel_margin_combined():
+    doc = parse_script(
+        '[4]\n小雪 "見慣れぬアイコン・・・" normal\n[4][枠外]\n※ロゴは実際のものと異なります\n'
+    )
+    assert doc["lines"][0]["panel_index"] == 4
+    assert doc["lines"][1]["meta"]["placement"] == "page_margin"
+    assert doc["lines"][1]["text"].startswith("※")
+
+
+def test_fun_cloud_and_shout():
+    doc = parse_script(
+        '[１]\n小雪 "やっと正月だー！" fun-cloud\n[3]\n小雪 "なんだこれ" shout\n'
+    )
+    assert doc["lines"][0]["type"] == "fun-cloud"
+    assert doc["lines"][1]["type"] == "shout"
+    assert doc["lines"][1]["panel_index"] == 3
