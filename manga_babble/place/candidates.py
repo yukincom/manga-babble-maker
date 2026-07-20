@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import numpy as np
 import cv2
+import numpy as np
 
 # Font floor used when sizing bubbles so 12px text + 1ch margin fits.
 MIN_FONT_PX = 12.0
@@ -22,10 +22,15 @@ def compute_bubble_candidates(
     max_half_w=None,
     max_half_h=None,
     prefer_text_size: bool = True,
+    page_occupancy=None,
 ):
     """
     Return list of {bbox: (x1,y1,x2,y2), score: float} inside frame_bbox,
     avoiding body/face/extra occupied regions.
+
+    If ``page_occupancy`` (full-page uint8 mask, >0 = hard) is set, it is
+    the primary free-space signal (ink + face margins). Body AABBs should
+    then be empty so white-inside-blue stays usable.
 
     If prefer_text_size is True (default), bubble half-size is driven by
     min_half_* (from text metrics), not by the free-space peak radius.
@@ -59,8 +64,24 @@ def compute_bubble_candidates(
             min(my2, res_y),
         )
 
+    # Pixel occupancy (ink dilate + faces) — real free space
+    if page_occupancy is not None:
+        ph, pw = page_occupancy.shape[:2]
+        ix1 = max(0, int(np.floor(fx1)))
+        iy1 = max(0, int(np.floor(fy1)))
+        ix2 = min(pw, int(np.ceil(fx2)))
+        iy2 = min(ph, int(np.ceil(fy2)))
+        if ix2 > ix1 and iy2 > iy1:
+            crop = page_occupancy[iy1:iy2, ix1:ix2]
+            small = cv2.resize(crop, (res_x, res_y), interpolation=cv2.INTER_AREA)
+            occupied = np.maximum(occupied, (small > 0).astype(np.uint8))
+
     margin = max(1, int(res_x * margin_ratio))
-    all_occ = list(body_bboxes) + list(face_bboxes) + list(extra_bboxes or [])
+    # When pixel mask is present, skip solid body AABBs (they fill white voids)
+    if page_occupancy is not None:
+        all_occ = list(extra_bboxes or [])
+    else:
+        all_occ = list(body_bboxes) + list(face_bboxes) + list(extra_bboxes or [])
     for bbox in all_occ:
         mx1, my1, mx2, my2 = to_mask_coords(bbox)
         occupied[
@@ -222,11 +243,17 @@ def size_from_text(
             full_h = max(full_h, side * 0.95)
         min_half_w, min_half_h = full_w / 2, full_h / 2
     elif shape in ("jagged", "giza"):
+        # Shout needs readable presence — floor size so short lines aren't tiny stars
         full_w, full_h = content_w, content_h
-        side = max(full_w, full_h) * 1.05
-        # Keep shout near-square but not thinner than content
-        min_half_w = max(min_half_w, min(side, content_w * 1.3) / 2)
-        min_half_h = max(min_half_h, side / 2)
+        min_side = max(full_w, full_h, char_px * 7.0)  # ~196px on typical pages
+        side = max(min_side, max(full_w, full_h) * 1.15)
+        min_half_w = max(min_half_w, side * 0.48)
+        min_half_h = max(min_half_h, side * 0.5)
+
+    # Narration tall rect: keep readable width/height without flush thin strip only
+    if shape in ("v-rect", "tall-rect", "rect") or shape == "narration":
+        min_half_w = max(min_half_w, char_px * 1.2)
+        min_half_h = max(min_half_h, max(rows, 3) * char_px * 0.55)
 
     max_half_w = page_w * 0.35
     max_half_h = page_h * 0.28

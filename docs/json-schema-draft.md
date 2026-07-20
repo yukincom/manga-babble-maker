@@ -116,6 +116,62 @@
 
 `faces[].speaker` は検出では通常出ない。後段マッピングまたは人手で付与。
 
+### 2b. 話者アンカー（`anchors`）— モードB / ネーム先
+
+検出 face と同じ役割の矩形。**頭・立ち位置・ラベル位置**など、尻尾 aim と HARD 占有に使う。  
+完成絵検出の代わり、または併用（place は `faces ∪ anchors` を同一 AimRef に正規化）。
+
+`detections.anchors` でも、構造 JSON の **トップレベル `anchors`** でも可（`place` はどちらも読む）。
+
+```json
+{
+  "schema_version": 1,
+  "page": { "width": 1000, "height": 800 },
+  "frames": [
+    { "id": "f0", "bbox": [40, 40, 960, 760] }
+  ],
+  "anchors": [
+    {
+      "id": "a_right",
+      "bbox": [680, 220, 820, 380],
+      "speaker": "話者A",
+      "frame_id": "f0",
+      "kind": "head"
+    },
+    {
+      "id": "a_left",
+      "bbox": [160, 240, 300, 400],
+      "speaker": "話者B",
+      "frame_id": "f0",
+      "kind": "head"
+    }
+  ],
+  "lines": [
+    {
+      "id": "l0",
+      "text": "右から話すよ",
+      "speaker": "話者A",
+      "panel_index": 1,
+      "type": "normal",
+      "order": 0
+    }
+  ]
+}
+```
+
+| フィールド | 必須 | 説明 |
+|------------|------|------|
+| `anchors[].id` | 推奨 | `lines[].anchor_id` / `face_id` から参照可 |
+| `anchors[].bbox` | **必須** | 頭または立ち位置の xyxy |
+| `anchors[].speaker` | 任意 | `lines[].speaker` と **完全一致**（入力データの名前。リポジトリ固定リストなし） |
+| `anchors[].frame_id` | 任意 | 省略時は bbox 中心が含まれる frame |
+| `anchors[].kind` | 任意 | `head` / `stand` / `label`（配置初期は未使用可） |
+| `lines[].anchor_id` | 任意 | 明示アンカー（`face_id` と同列） |
+
+**aim 解決の優先（概略）:**  
+明示 id → 当該 frame 内 speaker 名マッチ → 複数 aim の幾何 → 単一 aim はコマ内1本目のみ → body 上1/3 → null。  
+詳細・モード A/B: GitHub #31 / #35。例: `samples/structure/minimal.json`。
+
 ---
 
 ## 3. 中間: 配置結果（`layout`）

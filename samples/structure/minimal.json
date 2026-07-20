@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "page": {
+    "width": 1000,
+    "height": 800,
+    "id": "structure_demo"
+  },
+  "frames": [
+    {
+      "id": "f0",
+      "bbox": [40, 40, 960, 760]
+    }
+  ],
+  "anchors": [
+    {
+      "id": "a_right",
+      "bbox": [680, 220, 820, 380],
+      "speaker": "話者A",
+      "frame_id": "f0",
+      "kind": "head"
+    },
+    {
+      "id": "a_left",
+      "bbox": [160, 240, 300, 400],
+      "speaker": "話者B",
+      "frame_id": "f0",
+      "kind": "head"
+    }
+  ],
+  "bodies": [],
+  "faces": [],
+  "lines": [
+    {
+      "id": "l0",
+      "text": "右から話すよ",
+      "order": 0,
+      "speaker": "話者A",
+      "panel_index": 1,
+      "type": "normal"
+    },
+    {
+      "id": "l1",
+      "text": "左のセリフだ",
+      "order": 1,
+      "speaker": "話者B",
+      "panel_index": 1,
+      "type": "normal"
+    }
+  ],
+  "options": {
+    "style": "default",
+    "seed": 0
+  }
+}

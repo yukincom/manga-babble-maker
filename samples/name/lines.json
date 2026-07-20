@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "page": {
+    "image_path": "samples/name/page.png",
+    "width": 1488,
+    "height": 2105
+  },
+  "lines": [
+    {
+      "id": "l0",
+      "text": "やっと　正月だー！",
+      "order": 0,
+      "type": "fun-cloud",
+      "speaker": "小雪",
+      "panel_index": 1,
+      "meta": {
+        "panel_order": 0
+      }
+    },
+    {
+      "id": "l1",
+      "text": "2025年",
+      "order": 1,
+      "type": "narration",
+      "speaker": null,
+      "panel_index": 1,
+      "meta": {
+        "panel_order": 1
+      }
+    },
+    {
+      "id": "l2",
+      "text": "たまには　ツイッター…",
+      "order": 2,
+      "type": "normal",
+      "speaker": "小雪",
+      "panel_index": 2,
+      "meta": {
+        "panel_order": 0
+      }
+    },
+    {
+      "id": "l3",
+      "text": "今は　Xだっけ",
+      "order": 3,
+      "type": "normal",
+      "speaker": "小雪",
+      "panel_index": 2,
+      "meta": {
+        "panel_order": 1
+      }
+    },
+    {
+      "id": "l4",
+      "text": "ん？",
+      "order": 4,
+      "type": "normal",
+      "speaker": "小雪",
+      "panel_index": 3,
+      "meta": {
+        "panel_order": 0
+      }
+    },
+    {
+      "id": "l5",
+      "text": "なんだ　これ",
+      "order": 5,
+      "type": "shout",
+      "speaker": "小雪",
+      "panel_index": 3,
+      "meta": {
+        "panel_order": 1
+      }
+    },
+    {
+      "id": "l6",
+      "text": "見慣れぬ　アイコン・・・",
+      "order": 6,
+      "type": "normal",
+      "speaker": "小雪",
+      "panel_index": 4,
+      "meta": {
+        "panel_order": 0
+      }
+    },
+    {
+      "id": "l7",
+      "text": "※ロゴは実際のものと異なります",
+      "order": 7,
+      "type": "narration",
+      "meta": {
+        "placement": "page_margin"
+      }
+    }
+  ],
+  "options": {
+    "style": "default",
+    "seed": 0
+  }
+}

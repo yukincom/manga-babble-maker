@@ -224,8 +224,25 @@ page1
 
 ---
 
+## モードB（ネーム先）との関係
+
+台本の `話者` は、構造 JSON の `anchors[].speaker` と **同じ文字列**にすると、検出 face が無くても尻尾・近傍がそのアンカーに向く。
+
+```text
+小雪 "やっと　正月だー！" fun-cloud
+  → lines[].speaker = "小雪"
+  → anchors[] に speaker: "小雪" の頭 bbox
+```
+
+- 画像なし: `page.width/height` + `frames` + `anchors` + 本台本（または lines）で `place` 可  
+- 例: `samples/structure/minimal.json`  
+- 詳細 schema: [json-schema-draft.md](./json-schema-draft.md) §2b、計画 #35
+
+---
+
 ## 変更ログ
 
 | 日付 | 内容 |
 |------|------|
 | 2026-07-20 | v0。カンマなし・ユーザー提示の実例を正とする |
+| 2026-07-20 | モードB: speaker ↔ anchors の対応を追記 |

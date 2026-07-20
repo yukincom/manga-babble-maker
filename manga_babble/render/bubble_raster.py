@@ -48,15 +48,30 @@ def _nearest_point_on_bbox(px, py, bbox):
     return min(max(px, x1), x2), min(max(py, y1), y2)
 
 
-def _clamp_tail_target(cx, cy, rx, ry, target, max_len_ratio=0.45):
+def _clamp_tail_target(
+    cx, cy, rx, ry, target, max_len_ratio=0.18, max_stick_px: float | None = None
+):
+    """
+    Cap tail length so ＞ stays a short manga pointer, not a line to the mouth.
+
+    Tip sits just outside the ellipse rim (short stick). Long stretches across
+    the panel (e.g. Twitter bubble → far face) are clamped hard.
+    """
     tx, ty = target
     dx, dy = tx - cx, ty - cy
     dist = math.hypot(dx, dy) or 1.0
-    edge = max(rx, ry) * 0.85
-    max_len = max(rx, ry) * 2 * max_len_ratio
-    if dist <= edge + 4:
+    # Rim along the ray (ellipse approx with max radius — conservative short tail)
+    edge = max(rx, ry) * 0.92
+    # Stick past the rim: ~1/3 of minor radius, hard cap ~28px
+    if max_stick_px is not None:
+        stick = max_stick_px
+    else:
+        stick = max(10.0, min(rx, ry) * 0.32)
+    stick = min(stick, 28.0, max(rx, ry) * max_len_ratio + 14.0)
+    max_dist = edge + stick
+    if dist <= max_dist:
         return tx, ty
-    scale = min(1.0, (edge + max_len) / dist)
+    scale = max_dist / dist
     return cx + dx * scale, cy + dy * scale
 
 
@@ -152,11 +167,7 @@ def _draw_one(
 
     if is_thought:
         # 心の声: oval + trail of circles (not cloud template)
-        fx1, fy1, fx2, fy2 = normalize_bbox(face)
-        aim = (fx1, fy1, fx2, fy2 + (fy2 - fy1) * 0.3)
-        target = _clamp_tail_target(
-            cx, cy, rx, ry, _nearest_point_on_bbox(cx, cy, aim)
-        )
+        target = _clamp_tail_target(cx, cy, rx, ry, _mouth_aim_point(face))
         for i, frac in enumerate((0.35, 0.58, 0.78)):
             bx = cx + (target[0] - cx) * frac
             by = cy + (target[1] - cy) * frac
@@ -172,15 +183,24 @@ def _draw_one(
     _draw_triangle_tail(draw, cx, cy, rx, ry, face, stroke)
 
 
-def _draw_triangle_tail(draw, cx, cy, rx, ry, face, stroke):
+def _mouth_aim_point(face) -> tuple[float, float]:
+    """Aim tail at lower half of face bbox (mouth area), not forehead/center."""
     fx1, fy1, fx2, fy2 = normalize_bbox(face)
-    aim = (fx1, fy1, fx2, fy2 + (fy2 - fy1) * 0.3)
-    target = _clamp_tail_target(cx, cy, rx, ry, _nearest_point_on_bbox(cx, cy, aim))
+    mx = (fx1 + fx2) / 2
+    # Below geometric center (~72% down the face box)
+    my = fy1 + (fy2 - fy1) * 0.72
+    return mx, my
+
+
+def _draw_triangle_tail(draw, cx, cy, rx, ry, face, stroke):
+    mouth = _mouth_aim_point(face)
+    target = _clamp_tail_target(cx, cy, rx, ry, mouth)
     angle = math.atan2(target[1] - cy, target[0] - cx)
-    base_x = cx + rx * 0.92 * math.cos(angle)
-    base_y = cy + ry * 0.92 * math.sin(angle)
+    # Base sits on the ellipse rim; tip is a short stick beyond
+    base_x = cx + rx * 0.95 * math.cos(angle)
+    base_y = cy + ry * 0.95 * math.sin(angle)
     perp = angle + math.pi / 2
-    tw = min(16, max(8, min(rx, ry) * 0.25))
+    tw = min(14, max(7, min(rx, ry) * 0.22))
     dx, dy = math.cos(perp) * tw / 2, math.sin(perp) * tw / 2
     tri = [
         (base_x + dx, base_y + dy),

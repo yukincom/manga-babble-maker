@@ -14,7 +14,21 @@ from __future__ import annotations
 from typing import Any
 
 from manga_babble import SCHEMA_VERSION
+from manga_babble.place.aim import (
+    aims_in_frame,
+    collect_aims,
+    hard_avoid_boxes,
+    resolve_aim,
+)
 from manga_babble.place.candidates import compute_bubble_candidates, size_from_text
+from manga_babble.place.occupancy import (
+    build_occupancy_color,
+    build_page_occupancy,
+    hits_occupancy,
+    load_page_gray,
+    page_has_color_fill,
+    prepare_color_page,
+)
 from manga_babble.schema import ensure_line_ids, normalize_bbox
 from manga_babble.text.breaks import split_text_to_chunks
 from manga_babble.tone.resolve import is_page_margin_line, resolve_style
@@ -26,6 +40,9 @@ _SLOTS = (
     (0.22, 0.72),  # ③ 左下
     (0.78, 0.72),  # ④ 右下
 )
+# Keep bubbles off the panel border (manga gutters / 枠線)
+_FRAME_EDGE_PAD_MIN = 16.0
+_FRAME_EDGE_PAD_RATIO = 0.045
 
 
 def _det_list(detections: dict[str, Any], key: str) -> list[dict[str, Any]]:
@@ -219,26 +236,90 @@ def _match_face(
     return chosen, _bbox_of(chosen)
 
 
+def _frame_edge_pad(frame_bbox) -> float:
+    fx1, fy1, fx2, fy2 = frame_bbox
+    fw, fh = max(1.0, fx2 - fx1), max(1.0, fy2 - fy1)
+    return max(_FRAME_EDGE_PAD_MIN, min(fw, fh) * _FRAME_EDGE_PAD_RATIO)
+
+
+def _inset_frame(frame_bbox, pad: float | None = None):
+    """Usable inner rect — bubbles should stay inside this."""
+    fx1, fy1, fx2, fy2 = frame_bbox
+    p = _frame_edge_pad(frame_bbox) if pad is None else pad
+    ix1, iy1 = fx1 + p, fy1 + p
+    ix2, iy2 = fx2 - p, fy2 - p
+    if ix2 <= ix1 + 8 or iy2 <= iy1 + 8:
+        # Tiny panel: smaller pad
+        p = min(p, max(4.0, min(fx2 - fx1, fy2 - fy1) * 0.08))
+        ix1, iy1 = fx1 + p, fy1 + p
+        ix2, iy2 = fx2 - p, fy2 - p
+    if ix2 <= ix1 or iy2 <= iy1:
+        return frame_bbox
+    return (ix1, iy1, ix2, iy2)
+
+
+def _clamp_bb_to_frame(bb, frame_bbox, pad: float | None = None):
+    """Clamp bubble into inset frame, preserving size when possible."""
+    inner = _inset_frame(frame_bbox, pad)
+    ix1, iy1, ix2, iy2 = inner
+    x1, y1, x2, y2 = bb
+    w, h = x2 - x1, y2 - y1
+    iw, ih = ix2 - ix1, iy2 - iy1
+    if w > iw:
+        # Shrink-to-fit width
+        cx = (x1 + x2) / 2
+        x1 = max(ix1, min(cx - iw / 2, ix2 - iw))
+        x2 = x1 + min(w, iw)
+    else:
+        if x1 < ix1:
+            x1, x2 = ix1, ix1 + w
+        if x2 > ix2:
+            x2, x1 = ix2, ix2 - w
+    if h > ih:
+        cy = (y1 + y2) / 2
+        y1 = max(iy1, min(cy - ih / 2, iy2 - ih))
+        y2 = y1 + min(h, ih)
+    else:
+        if y1 < iy1:
+            y1, y2 = iy1, iy1 + h
+        if y2 > iy2:
+            y2, y1 = iy2, iy2 - h
+    return (x1, y1, x2, y2)
+
+
 def _slot_bbox(
     frame_bbox,
     slot_xy: tuple[float, float],
     half_w: float,
     half_h: float,
 ) -> tuple[float, float, float, float]:
-    fx1, fy1, fx2, fy2 = frame_bbox
-    fw, fh = fx2 - fx1, fy2 - fy1
+    # Place within inset so slots never sit on the 枠線
+    ix1, iy1, ix2, iy2 = _inset_frame(frame_bbox)
+    fw, fh = ix2 - ix1, iy2 - iy1
     sx, sy = slot_xy
-    cx = fx1 + fw * sx
-    cy = fy1 + fh * sy
+    cx = ix1 + fw * sx
+    cy = iy1 + fh * sy
     half_w = min(half_w, fw * 0.45)
     half_h = min(half_h, fh * 0.45)
     bb = (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
-    return (
-        max(fx1, bb[0]),
-        max(fy1, bb[1]),
-        min(fx2, bb[2]),
-        min(fy2, bb[3]),
-    )
+    return _clamp_bb_to_frame(bb, frame_bbox)
+
+
+def _center_bbox(
+    frame_bbox,
+    half_w: float,
+    half_h: float,
+    rel_y: float = 0.38,
+) -> tuple[float, float, float, float]:
+    """Bubble centered in frame (slightly upper) — for face-less panels."""
+    ix1, iy1, ix2, iy2 = _inset_frame(frame_bbox)
+    fw, fh = ix2 - ix1, iy2 - iy1
+    half_w = min(half_w, fw * 0.45)
+    half_h = min(half_h, fh * 0.45)
+    cx = (ix1 + ix2) / 2
+    cy = iy1 + fh * rel_y
+    bb = (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
+    return _clamp_bb_to_frame(bb, frame_bbox)
 
 
 def _nudge_away_from(
@@ -248,14 +329,13 @@ def _nudge_away_from(
     step: float = 12.0,
     hard_faces: list[tuple] | None = None,
 ) -> tuple[float, float, float, float]:
-    """Nudge bbox within frame to reduce overlap with blockers."""
-    fx1, fy1, fx2, fy2 = frame_bbox
+    """Nudge bbox within inset frame to reduce overlap with blockers."""
+    ix1, iy1, ix2, iy2 = _inset_frame(frame_bbox)
     x1, y1, x2, y2 = bb
     w, h = x2 - x1, y2 - y1
     hard_faces = hard_faces or []
     for _ in range(32):
         hit = None
-        # Prefer escaping faces first
         for bl in hard_faces:
             if _overlaps((x1, y1, x2, y2), bl, pad=2.0):
                 hit = bl
@@ -277,10 +357,11 @@ def _nudge_away_from(
         cx, cy = cx + dx, cy + dy
         x1, y1 = cx - w / 2, cy - h / 2
         x2, y2 = cx + w / 2, cy + h / 2
-        x1 = max(fx1, min(x1, fx2 - w))
-        y1 = max(fy1, min(y1, fy2 - h))
+        # Stay inside inset
+        x1 = max(ix1, min(x1, ix2 - w))
+        y1 = max(iy1, min(y1, iy2 - h))
         x2, y2 = x1 + w, y1 + h
-    return (x1, y1, x2, y2)
+    return _clamp_bb_to_frame((x1, y1, x2, y2), frame_bbox)
 
 
 def _face_blockers(
@@ -327,6 +408,11 @@ def _overlaps_any_face(bb, face_boxes: list[tuple], pad: float = 2.0) -> bool:
     return any(_overlaps(bb, fb, pad=pad) for fb in face_boxes)
 
 
+def _overlaps_any_hard(bb, hard_boxes: list[tuple], pad: float = 4.0) -> bool:
+    """True if bubble intersects face or body (blue) hard zones."""
+    return any(_overlaps(bb, hb, pad=pad) for hb in hard_boxes)
+
+
 def _dist2(a, b) -> float:
     return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
 
@@ -343,86 +429,222 @@ def _place_bubble_in_frame(
     placed: list[tuple],
     preferred_slot: int,
     prefer_near: tuple[float, float] | None = None,
+    shape: str = "ellipse",
+    hard_boxes: list[tuple] | None = None,
+    page_occupancy=None,
 ) -> tuple[tuple[float, float, float, float], float, dict[str, Any]]:
     """
-    Place bubble avoiding faces hard; bodies soft (clipped).
-    Among valid candidates, prefer preferred slot then near prefer_near (speaker).
-    Returns (bbox, score, meta).
+    Place bubble inside green frame inset.
+
+    HARD occupancy:
+      - padded face / aim boxes (red)
+      - pixel ink mask (dilated lines = person-fill assist) when page_occupancy set
+    Body AABB is NOT solid-filled when ink is available (white-in-blue stays free).
     """
-    face_boxes = _face_blockers(faces, frame_bbox, frame_id)
+    face_boxes = (
+        list(hard_boxes)
+        if hard_boxes is not None
+        else _face_blockers(faces, frame_bbox, frame_id)
+    )
     body_boxes = _body_blockers_clipped(bodies, frame_bbox, frame_id)
-    soft_blockers = list(body_boxes) + list(placed)
+    use_ink = page_occupancy is not None
+    # Without ink, fall back to body AABB hard (legacy)
+    hard_boxes_geom = list(face_boxes) + ([] if use_ink else list(body_boxes))
+    soft_blockers = list(placed)
     pref_si = preferred_slot % len(_SLOTS)
-    # Anchor: speaker face / prefer_near, else preferred slot center
+    shape_l = (shape or "ellipse").replace("_", "-")
+    is_shout = shape_l in ("jagged", "giza") or shape_l == "shout"
+    is_narration = shape_l in ("v-rect", "tall-rect", "rect") or shape_l == "narration"
     if prefer_near is None:
         prefer_near = _center(_slot_bbox(frame_bbox, _SLOTS[pref_si], half_w, half_h))
 
-    def cand_rank(bb, mode: str, si: int) -> tuple:
-        """Lower is better."""
+    def is_blocked(bb, pad: float = 4.0) -> bool:
+        if _overlaps_any_hard(bb, hard_boxes_geom, pad=pad):
+            return True
+        # Slightly tolerant: slot probes often graze pink shoulder / face pad
+        if use_ink and hits_occupancy(page_occupancy, bb, max_frac=0.10):
+            return True
+        return False
+
+    def edge_pen(bb) -> float:
+        inner = _inset_frame(frame_bbox)
+        pen = 0.0
+        if (
+            bb[0] < inner[0] - 1
+            or bb[1] < inner[1] - 1
+            or bb[2] > inner[2] + 1
+            or bb[3] > inner[3] + 1
+        ):
+            pen += 800
+        pad = _frame_edge_pad(frame_bbox)
+        for d in (
+            bb[0] - frame_bbox[0],
+            bb[1] - frame_bbox[1],
+            frame_bbox[2] - bb[2],
+            frame_bbox[3] - bb[3],
+        ):
+            if d < pad:
+                pen += (pad - d) * 8
+        return pen
+
+    def restore_size(bb, hw: float, hh: float):
         cx, cy = _center(bb)
-        # Keep some distance from face center (don't hug face edge)
-        face_pen = 0.0
+        expanded = _clamp_bb_to_frame((cx - hw, cy - hh, cx + hw, cy + hh), frame_bbox)
+        if is_blocked(expanded, pad=4.0):
+            if not is_blocked(bb, pad=4.0):
+                return bb
+        return expanded
+
+    # Preferred manga slot anchor (TR for first line, etc.)
+    slot_anchor = _center(_slot_bbox(frame_bbox, _SLOTS[pref_si], half_w, half_h))
+    faceless = not face_boxes and not is_narration
+
+    def face_margin_pen(bb) -> float:
+        """Moderate distance from face — not glued, not banished to far corner."""
+        if not face_boxes:
+            return 0.0
+        pen = 0.0
+        cx, cy = _center(bb)
         for fb in face_boxes:
             fcx, fcy = _center(fb)
             d = _dist2((cx, cy), (fcx, fcy)) ** 0.5
-            # Ideal: not overlapping, moderately near for tail
-            if d < 40:
-                face_pen += 5000
-            elif d > 400:
-                face_pen += (d - 400) * 0.5
-        placed_pen = sum(
-            _intersection_area(bb, p) for p in placed
-        )
-        slot_pen = 0 if si == pref_si else 200 * abs(si - pref_si)
-        mode_pen = {"slot": 0, "free_space": 60, "fallback_faces_only": 120}.get(
-            mode, 50
-        )
-        near_pen = _dist2((cx, cy), prefer_near) ** 0.5
-        # Prefer preferred-slot side of frame (x)
+            fh = max(1.0, fb[3] - fb[1])
+            # sweet band: ~0.6–1.8 face-heights away
+            if d < fh * 0.55:
+                pen += 900
+            elif d < fh * 0.85:
+                pen += 250
+            elif d > fh * 3.5:
+                pen += (d - fh * 3.5) * 0.8
+        return pen
+
+    def cand_rank(bb, mode: str, si: int) -> tuple:
+        cx, cy = _center(bb)
+        placed_pen = sum(_intersection_area(bb, p) for p in placed)
+        # Face-less panels: center first (logo / icon panels)
+        if faceless:
+            if mode == "center":
+                mode_pen, slot_pen = 0, 0
+            elif mode == "slot":
+                mode_pen, slot_pen = 120, abs(si) * 25
+            else:
+                mode_pen, slot_pen = 160, 0
+        elif mode == "slot":
+            mode_pen = 0
+            order = [(pref_si + k) % len(_SLOTS) for k in range(len(_SLOTS))]
+            try:
+                slot_pen = order.index(si) * 35
+            except ValueError:
+                slot_pen = 100
+        elif mode == "center":
+            mode_pen, slot_pen = 90, 0
+        else:
+            # free_space is fallback — still prefer near preferred slot (TR…)
+            mode_pen, slot_pen = 80, 0
+        if is_narration and mode == "center":
+            mode_pen = 500
+        # Placement pull = preferred manga slot (TR→…), NOT face center.
+        # Face only hard-avoids + face_margin_pen; tails aim at face separately.
+        slot_pull = _dist2((cx, cy), slot_anchor) ** 0.5
+        near_pen = _dist2((cx, cy), prefer_near) ** 0.5 if prefer_near else 0.0
         side_pen = 0.0
-        if prefer_near is not None:
-            # Reward being on the same half as prefer_near
-            mid_x = (frame_bbox[0] + frame_bbox[2]) / 2
-            if (prefer_near[0] - mid_x) * (cx - mid_x) < 0:
-                side_pen = 150
-        return (placed_pen, mode_pen + slot_pen + face_pen + side_pen + near_pen * 0.2)
+        mid_x = (frame_bbox[0] + frame_bbox[2]) / 2
+        # Keep bubble on the preferred-slot side of the panel
+        if (slot_anchor[0] - mid_x) * (cx - mid_x) < 0:
+            side_pen = 320
+        # Prefer upper area for early slots (① TR, ② TL) — manga entry from top
+        y_pen = 0.0
+        if pref_si in (0, 1):
+            fy1, fy2 = frame_bbox[1], frame_bbox[3]
+            rel_y = (cy - fy1) / max(1.0, fy2 - fy1)
+            if rel_y > 0.38:
+                y_pen = (rel_y - 0.38) * 900  # strong: ん？ must not sink
+            if rel_y > 0.62:
+                y_pen += (rel_y - 0.62) * 500
+        size_pen = 0.0
+        bw, bh = bb[2] - bb[0], bb[3] - bb[1]
+        if bw < half_w * 1.6:
+            size_pen += (half_w * 2 - bw) * 0.8
+        if bh < half_h * 1.6:
+            size_pen += (half_h * 2 - bh) * 0.8
+        total = (
+            mode_pen
+            + slot_pen
+            + side_pen
+            + near_pen * 0.08
+            + slot_pull * 0.85
+            + face_margin_pen(bb)
+            + edge_pen(bb)
+            + y_pen
+            + size_pen
+        )
+        return (placed_pen, total)
 
     def collect(hw: float, hh: float) -> list[tuple]:
         found: list[tuple] = []
-        for si in range(len(_SLOTS)):
+        nudge_hard = hard_boxes_geom
+
+        def _try_add(bb, mode: str, si: int) -> None:
+            bb = restore_size(bb, hw, hh)
+            if is_blocked(bb, pad=4.0):
+                return
+            if any(_intersection_area(bb, p) > _area(bb) * 0.55 for p in placed):
+                return
+            found.append((bb, mode, si))
+
+        for k in range(len(_SLOTS)):
+            si = (pref_si + k) % len(_SLOTS)
             cand = _slot_bbox(frame_bbox, _SLOTS[si], hw, hh)
             nudged = _nudge_away_from(
-                cand, soft_blockers + face_boxes, frame_bbox, hard_faces=face_boxes
+                cand, soft_blockers + nudge_hard, frame_bbox, hard_faces=nudge_hard
             )
-            if _overlaps_any_face(nudged, face_boxes):
-                continue
-            if any(_intersection_area(nudged, p) > _area(nudged) * 0.55 for p in placed):
-                continue
-            found.append((nudged, "slot", si))
+            _try_add(nudged, "slot", si)
 
-        # Free-space: faces + placed are hard; body is soft (omit from mask)
-        # so dialogue can sit over clothing when needed — never over faces.
-        cands = compute_bubble_candidates(
-            frame_bbox,
-            [],
-            face_boxes,
-            extra_bboxes=placed,
-            top_k=8,
-            min_half_w=hw,
-            min_half_h=hh,
-            max_half_w=max_hw,
-            max_half_h=max_hh,
-            prefer_text_size=True,
-        )
-        for c in cands:
-            bb = tuple(float(x) for x in c["bbox"])
-            if _overlaps_any_face(bb, face_boxes):
-                continue
-            # Soft body penalty applied via ranking only
-            found.append((bb, "free_space", pref_si))
+        # Preferred-slot micro-probes (higher / tighter to corner) when TR/TL
+        # standard slot grazes face pad or pink fill — e.g. small 「ん？」
+        if pref_si in (0, 1) and not any(m == "slot" and si == pref_si for _, m, si in found):
+            if pref_si == 0:
+                probes = ((0.86, 0.14), (0.78, 0.14), (0.88, 0.22), (0.70, 0.16))
+            else:
+                probes = ((0.14, 0.14), (0.22, 0.14), (0.12, 0.22), (0.30, 0.16))
+            for pxy in probes:
+                cand = _slot_bbox(frame_bbox, pxy, hw, hh)
+                nudged = _nudge_away_from(
+                    cand, soft_blockers + nudge_hard, frame_bbox, hard_faces=nudge_hard
+                )
+                _try_add(nudged, "slot", pref_si)
+
+        # Face-less: always try center (logo panel) — even with ink occupancy
+        if faceless:
+            for ry in (0.38, 0.42, 0.32, 0.48):
+                cen = _center_bbox(frame_bbox, hw, hh, rel_y=ry)
+                _try_add(cen, "center", pref_si)
+                if any(m == "center" for _, m, _ in found):
+                    break
+
+        # Free-space: fallback when preferred slot missing (still ranked by slot_pull/y_pen)
+        has_pref_slot = any(m == "slot" and si == pref_si for _, m, si in found)
+        if not has_pref_slot or not found:
+            inner = _inset_frame(frame_bbox)
+            cands = compute_bubble_candidates(
+                inner,
+                [] if use_ink else body_boxes,
+                [] if use_ink else face_boxes,
+                extra_bboxes=placed,
+                top_k=12,
+                min_half_w=hw,
+                min_half_h=hh,
+                max_half_w=max_hw,
+                max_half_h=max_hh,
+                prefer_text_size=True,
+                page_occupancy=page_occupancy,
+            )
+            for c in cands:
+                bb = _clamp_bb_to_frame(tuple(float(x) for x in c["bbox"]), frame_bbox)
+                _try_add(bb, "free_space", pref_si)
         return found
 
-    scales = (1.0, 0.88, 0.76, 0.65)
+    scales = (1.0, 0.92, 0.8) if is_shout else (1.0, 0.9, 0.78, 0.65)
     for sc in scales:
         hw = max(24.0, half_w * sc)
         hh = max(20.0, half_h * sc)
@@ -431,51 +653,41 @@ def _place_bubble_in_frame(
             continue
         opts.sort(key=lambda t: cand_rank(t[0], t[1], t[2]))
         bb, mode, si = opts[0]
+        bb = restore_size(bb, hw, hh)
+        if is_blocked(bb, pad=4.0):
+            continue
         return bb, float(10 - sc * 2), {
             "placement_mode": mode,
             "slot_index": si,
             "overlap_face": False,
             "size_scale": sc,
+            "occupancy": "ink" if use_ink else "aabb",
         }
 
-    # Last resort
-    hw, hh = max(24.0, half_w * 0.6), max(20.0, half_h * 0.6)
-    bb = _slot_bbox(frame_bbox, _SLOTS[pref_si], hw, hh)
-    bb = _nudge_away_from(
-        bb, soft_blockers + face_boxes, frame_bbox, hard_faces=face_boxes
-    )
-    still_face = _overlaps_any_face(bb, face_boxes)
-    if still_face:
-        cands = compute_bubble_candidates(
-            frame_bbox,
-            [],
-            face_boxes,
-            extra_bboxes=placed,
-            top_k=8,
-            min_half_w=hw,
-            min_half_h=hh,
-            max_half_w=max_hw,
-            max_half_h=max_hh,
-            prefer_text_size=True,
+    hw, hh = max(24.0, half_w * 0.55), max(20.0, half_h * 0.55)
+    for k in range(len(_SLOTS)):
+        si = (pref_si + k) % len(_SLOTS)
+        bb = _slot_bbox(frame_bbox, _SLOTS[si], hw, hh)
+        bb = _nudge_away_from(
+            bb, soft_blockers + hard_boxes_geom, frame_bbox, hard_faces=hard_boxes_geom
         )
-        ranked = []
-        for c in cands:
-            cand = tuple(float(x) for x in c["bbox"])
-            if not _overlaps_any_face(cand, face_boxes):
-                ranked.append(cand)
-        if ranked:
-            ranked.sort(key=lambda b: cand_rank(b, "fallback_faces_only", pref_si))
-            return ranked[0], 0.4, {
-                "placement_mode": "fallback_faces_only",
-                "slot_index": pref_si,
+        bb = _clamp_bb_to_frame(bb, frame_bbox)
+        if not is_blocked(bb, pad=2.0):
+            return bb, 0.3, {
+                "placement_mode": "fallback_slot",
+                "slot_index": si,
                 "overlap_face": False,
-                "size_scale": 0.6,
+                "size_scale": 0.55,
+                "occupancy": "ink" if use_ink else "aabb",
             }
-    return bb, 0.2, {
+    bb = _slot_bbox(frame_bbox, _SLOTS[pref_si], hw, hh)
+    bb = _clamp_bb_to_frame(bb, frame_bbox)
+    return bb, 0.1, {
         "placement_mode": "fallback",
         "slot_index": pref_si,
-        "overlap_face": still_face,
-        "size_scale": 0.6,
+        "overlap_face": _overlaps_any_hard(bb, face_boxes, pad=2.0),
+        "size_scale": 0.55,
+        "occupancy": "ink" if use_ink else "aabb",
     }
 
 
@@ -552,10 +764,69 @@ def build_layout(
     frames = _det_list(detections_doc, "frames")
     faces = _det_list(detections_doc, "faces")
     bodies = _det_list(detections_doc, "bodies")
+    anchors = _det_list(detections_doc, "anchors")
+    # Structure JSON may put frames/anchors at top level (mode B)
+    if not frames and detections_doc.get("frames"):
+        frames = list(detections_doc["frames"] or [])
+    if not anchors and detections_doc.get("anchors"):
+        anchors = list(detections_doc["anchors"] or [])
     frames_ordered = frames_in_reading_order(frames)
 
-    lines = ensure_line_ids(list(lines_doc.get("lines") or []))
+    aims = collect_aims(faces, anchors)
+
+    raw_lines = list(lines_doc.get("lines") or [])
+    # Combined structure file: lines live next to frames/anchors
+    if not raw_lines and detections_doc.get("lines"):
+        raw_lines = list(detections_doc["lines"] or [])
+    lines = ensure_line_ids(raw_lines)
     lines = sorted(lines, key=lambda x: (x.get("order", 0), x.get("id", "")))
+
+    # Occupancy:
+    #   color page → person chromatic fill (+ line ink), ignore body AABB
+    #   mono page  → ink envelope fallback
+    image_path = page.get("image_path") or (lines_doc.get("page") or {}).get(
+        "image_path"
+    )
+    page_occupancy = None
+    occupancy_mode = "none"
+    face_bbs = [a.bbox for a in aims]
+    for f in faces:
+        if f.get("bbox"):
+            face_bbs.append(normalize_bbox(f["bbox"]))
+    frame_bbs = [normalize_bbox(f["bbox"]) for f in frames if f.get("bbox")]
+    body_bbs = [normalize_bbox(b["bbox"]) for b in bodies if b.get("bbox")]
+
+    color_prep = None
+    if image_path:
+        try:
+            color_prep = prepare_color_page(image_path)
+        except Exception:
+            color_prep = None
+
+    if color_prep and color_prep.get("has_color") and color_prep.get("fill_mask") is not None:
+        page_occupancy = build_occupancy_color(
+            color_prep["fill_mask"],
+            line_ink_mask=color_prep.get("line_ink_mask"),
+            face_bboxes=face_bbs,
+            frame_bboxes=frame_bbs,
+            face_pad_ratio=0.12,
+            include_lines=True,
+        )
+        occupancy_mode = "color_fill"
+        # User rule: ignore detector body boxes when fill mask drives free space
+        bodies = []
+    else:
+        gray = load_page_gray(image_path)
+        if gray is not None:
+            page_occupancy = build_page_occupancy(
+                gray,
+                face_bbs,
+                body_bboxes=body_bbs,
+                frame_bboxes=frame_bbs,
+                threshold=200,
+                face_pad_ratio=0.12,
+            )
+            occupancy_mode = "ink_envelope"
 
     slot_counter: dict[str, int] = {}
     placed_bboxes: list[tuple] = []
@@ -600,17 +871,39 @@ def build_layout(
             meta_extra["text_chunks"] = text_chunks
             meta_extra["n_cols"] = len(text_chunks)
 
-            # Pre-match face for proximity bias (may refine after place)
-            pre_face, pre_fbb = _match_face(
+            # Aim: faces ∪ anchors (#36). Speaker name / explicit id / R3 heuristics
+            want_tail = tone not in ("narration", "shout") and shape not in (
+                "v-rect",
+                "tall-rect",
+                "rect",
+                "jagged",
+                "giza",
+            )
+            pre_aim, pre_fbb, pre_src = resolve_aim(
                 line,
-                faces,
+                aims,
                 frame_bbox,
                 frame_id,
                 slot_index=slot_i,
                 bubble_bbox=None,
+                bodies=bodies,
+                allow_body_fallback=want_tail,
             )
-            prefer_near = _center(pre_fbb) if pre_fbb is not None else None
+            # Placement ranking uses preferred SLOT only (TR→TL…).
+            # Do NOT pull bubble center toward face — that sank 「ん？」 to the
+            # lower free pocket beside the head. Tails still aim via resolve_aim.
+            prefer_slot = slot_i
+            prefer_near = None
+            if tone == "narration":
+                prefer_slot = 1 if slot_i == 0 else slot_i
+                prefer_near = _center(
+                    _slot_bbox(frame_bbox, _SLOTS[prefer_slot % len(_SLOTS)], half_w, half_h)
+                )
+            elif not aims_in_frame(aims, frame_bbox, frame_id):
+                # Face-less / logo panel → center bias
+                prefer_near = _center(frame_bbox)
 
+            hard_boxes = hard_avoid_boxes(aims, frame_bbox, frame_id)
             bb, score, place_meta = _place_bubble_in_frame(
                 frame_bbox,
                 half_w,
@@ -621,26 +914,38 @@ def build_layout(
                 bodies,
                 frame_id,
                 placed_bboxes,
-                preferred_slot=slot_i,
+                preferred_slot=prefer_slot,
                 prefer_near=prefer_near,
+                shape=shape,
+                hard_boxes=hard_boxes,
+                page_occupancy=page_occupancy,
             )
+            bb = _clamp_bb_to_frame(bb, frame_bbox)
             meta_extra.update(place_meta)
+            meta_extra["occupancy_mode"] = occupancy_mode
 
-            face_obj, face_bb = _match_face(
+            aim_obj, face_bb, tail_from = resolve_aim(
                 line,
-                faces,
+                aims,
                 frame_bbox,
                 frame_id,
                 slot_index=slot_i,
                 bubble_bbox=bb,
+                bodies=bodies,
+                allow_body_fallback=want_tail,
             )
-            # Keep pre-match for lone-face first line if post-match agrees / empty
-            if face_obj is None and pre_face is not None and slot_i == 0:
-                face_obj, face_bb = pre_face, pre_fbb
-            face_id = face_obj.get("id") if face_obj else None
-            if tone == "narration":
+            if aim_obj is None and pre_aim is not None and slot_i == 0:
+                aim_obj, face_bb, tail_from = pre_aim, pre_fbb, pre_src
+            face_id = aim_obj.id if aim_obj is not None else None
+            if tail_from:
+                meta_extra["tail_from"] = tail_from
+            if aim_obj is not None:
+                meta_extra["aim_source"] = aim_obj.source
+
+            if not want_tail or tone == "narration":
                 face_bb = None
                 face_id = None
+                meta_extra.pop("tail_from", None)
 
         placed_bboxes.append(bb)
         bubbles.append(

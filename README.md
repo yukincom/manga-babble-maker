@@ -1,15 +1,15 @@
 # manga-babble-maker
 
-完成したマンガ絵とセリフ JSON から、吹き出しの**配置・種類・レイヤ出力**を行うツール。
+完成したマンガ絵とセリフ JSON から、吹き出しの**配置・種類・レイヤ出力**を行うツール。  
+**ネーム先（モードB）**: 画像なしでも `frames` + `anchors`（話者の頭 bbox）+ セリフで配置できる。
 
-- **配置**: キャラ/顔を避けた空き領域（幾何ヒューリスティック）
+- **配置**: aim（検出 face ∪ ネーム anchor）を避けた空き領域
 - **種類 (tone)**: セリフ規則（VLM 非依存）
 - **出力**: `bubble` PNG / `text` PNG / `layout.json`（文字データ必須）
-- **検出**: [RT-DETRv4-X Manga109-s v2](https://huggingface.co/tori29umai/rtdetrv4-x-manga109s_v2) ONNX（ローカル）
+- **検出**: [RT-DETRv4-X Manga109-s v2](https://huggingface.co/tori29umai/rtdetrv4-x-manga109s_v2) ONNX（ローカル）— モードA
 - **操作**: CLI → 同じ core を MCP で薄いラップ（エージェント向け）
 
-方針の正: [`Agent.md`](./Agent.md)  
-実装計画: [`docs/implementation-plan.md`](./docs/implementation-plan.md)
+方針の正: [`Agent.md`](./Agent.md) · 配置ルール: [#31](https://github.com/yukincom/manga-babble-maker/issues/31) · モードB: [#35](https://github.com/yukincom/manga-babble-maker/issues/35)
 
 ## セットアップ
 
@@ -58,7 +58,15 @@ python -m manga_babble run \
   --lines samples/demo_lines.json \
   --out-dir outputs/page \
   --model models/rtdetrv4-x-manga109s_v2/model.onnx
+
+# モードB: 構造のみ（画像不要）。frames + anchors + lines
+python -m manga_babble place \
+  --detections samples/structure/minimal.json \
+  --lines samples/structure/minimal.json \
+  --out outputs/structure/layout.json
 ```
+
+`anchors[].speaker` と `lines[].speaker` を同じ文字列にすると、尻尾・近傍がその頭 bbox に向く（検出 face 不要）。
 
 成功時、**stdout にマニフェスト JSON**（ログは stderr）。
 
