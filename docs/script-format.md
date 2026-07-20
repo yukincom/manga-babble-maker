@@ -128,10 +128,12 @@ JSON では:
 |----------|---------|-----------|------------|
 | `normal` | ellipse | normal | 楕円 |
 | `giza` | jagged | shout | 固い控えめギザ |
-| `kumo` | cloud | thought | 素材待ち（暫定楕円+丸） |
-| `thought` | cloud | thought | 同上（英名） |
+| `kumo` / `cloud` | cloud | **normal** | 楽しい・明るい**発話**（テンプレ） |
+| `thought` | ellipse | thought | **心の声**＝楕円＋丸連なり（雲にしない） |
 | `whisper` | dashed-ellipse | whisper | 破線楕円 |
 | `narration` | v-rect | narration | 縦長矩形 |
+
+心の声に雲を使いたい場合だけ、明示的に別ルールを足す（既定では分離）。
 
 tone 名を直接書いたとき（`shout` 等）も可。shape は既定:
 

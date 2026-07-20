@@ -11,8 +11,14 @@ def test_script_shape_tokens():
     tone, shape, src = resolve_style({"text": "x", "type": "giza"})
     assert tone == "shout" and shape == "jagged"
 
+    tone, shape, src = resolve_style({"text": "x", "type": "fun-cloud"})
+    assert tone == "normal" and shape == "fun-cloud"
+
     tone, shape, src = resolve_style({"text": "x", "type": "kumo"})
-    assert tone == "thought" and shape == "cloud"
+    assert tone == "normal" and shape == "fun-cloud"  # legacy alias
+
+    tone, shape, src = resolve_style({"text": "（心の声）", "type": "thought"})
+    assert tone == "thought" and shape == "ellipse"
 
     tone, shape, src = resolve_style({"text": "2025年", "type": "narration"})
     assert tone == "narration" and shape == "v-rect"

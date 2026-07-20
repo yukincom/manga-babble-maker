@@ -138,26 +138,81 @@ def compute_bubble_candidates(
     return results
 
 
-def size_from_text(text: str, page_w: float, page_h: float) -> tuple[float, float, float, float]:
+def size_from_text(
+    text: str,
+    page_w: float,
+    page_h: float,
+    *,
+    shape: str = "ellipse",
+    num_chunks: int | None = None,
+) -> tuple[float, float, float, float]:
     """
     Preferred half sizes from character count (vertical-friendly).
 
-    - Prefer single column when n < 12 (no wrap)
+    Important: ellipse roundness must NOT force extra text columns/line-breaks.
+    (That would over-break "read-heavy" manga.) Roundness is achieved by
+    **widening the balloon** (horizontal padding) when the text stack is tall,
+    while row/column count follows actual break chunks when provided.
+
     - ~1 character margin each side
-    - Sized so at least MIN_FONT_PX text can fit
+    - MIN_FONT_PX floor
+    - num_chunks: if known (from explicit / breaks), use as column count
     """
-    n = max(1, len(str(text).replace("\n", "").replace(" ", "")))
-    # Line-break policy: only consider multi-column if 12+ chars
-    if n < 12:
-        cols, rows = 1, n
+    # Ignore break markers for raw length; count chunks if markers present
+    t = str(text)
+    if num_chunks is None:
+        # Explicit agent breaks only — do not invent multi-column for sizing
+        if "　" in t or "/" in t or "\n" in t:
+            import re
+
+            parts = [p for p in re.split(r"[\u3000/\n\r]+", t) if p.strip()]
+            num_chunks = max(1, len(parts))
+            raw = "".join(parts)
+        else:
+            num_chunks = 1
+            raw = t.replace(" ", "")
     else:
-        cols = max(1, min(4, (n + 5) // 6))
-        rows = max(1, (n + cols - 1) // cols)
+        raw = (
+            t.replace("\n", "")
+            .replace("　", "")
+            .replace("/", "")
+            .replace(" ", "")
+        )
+    n = max(1, len(raw))
+    cols = max(1, int(num_chunks))
+    # Height follows longest column if even split of n over cols
+    rows = max(1, (n + cols - 1) // cols)
 
     char_px = max(MIN_FONT_PX, min(28.0, page_h / 50.0))
-    margin = char_px * 1.0  # one character padding each side
+    margin = char_px * 1.0
+
     min_half_w = (cols * char_px + 2 * margin) / 2
     min_half_h = (rows * char_px + 2 * margin) / 2
+
+    shape = (shape or "ellipse").replace("_", "-")
+    is_round_ellipse = shape in (
+        "ellipse",
+        "dashed-ellipse",
+        "fun-cloud",
+        "cloud",
+        "",
+    )
+
+    if is_round_ellipse:
+        # Widen (or slightly shorten ratio) without adding text columns.
+        # Tall text stack → fatter oval with empty side padding; text stays
+        # as few columns as breaks dictate (often 1).
+        full_w = min_half_w * 2
+        full_h = min_half_h * 2
+        # Target aspect h/w ≈ 1.0–1.2 (classic round-ish balloon)
+        if full_h > full_w * 1.2:
+            full_w = full_h / 1.1  # widen only
+        if n <= 4:
+            side = max(full_w, full_h)
+            full_w = side * 0.98
+            full_h = side * 1.0
+        min_half_w, min_half_h = full_w / 2, full_h / 2
+
     max_half_w = page_w * 0.35
     max_half_h = page_h * 0.28
     min_half_w = min(min_half_w, max_half_w)

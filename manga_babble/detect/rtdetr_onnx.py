@@ -44,22 +44,103 @@ def _contains(frame_bbox, point) -> bool:
     return x1 <= px <= x2 and y1 <= py <= y2
 
 
+def _iou(a, b) -> float:
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+    iw, ih = max(0.0, ix2 - ix1), max(0.0, iy2 - iy1)
+    inter = iw * ih
+    if inter <= 0:
+        return 0.0
+    area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
+    area_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
+    union = area_a + area_b - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _intersection_area(a, b) -> float:
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+    return max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+
+
+def _assign_frame_by_face_rule(item: dict, frames: list[dict]) -> str | None:
+    """
+    ぶち抜き対応の帰属:
+      1) bbox 中心が入っている frame
+      2) なければ / 複数なら 重なり面積最大の frame
+    「縁が1px触れただけ」で他コマにしないよう、中心優先。
+    """
+    if not frames:
+        return None
+    bb = item["bbox"]
+    c = _center(bb)
+    containing = []
+    for fr in frames:
+        fb = fr["bbox"]
+        if _contains(fb, c):
+            containing.append((fr, _intersection_area(bb, fb)))
+    if containing:
+        # among frames that contain the center, pick max overlap with the item
+        containing.sort(key=lambda x: x[1], reverse=True)
+        return containing[0][0].get("id")
+    # center outside all frames (true span): max intersection area
+    best_id, best_ia = None, 0.0
+    for fr in frames:
+        ia = _intersection_area(bb, fr["bbox"])
+        if ia > best_ia:
+            best_ia = ia
+            best_id = fr.get("id")
+    return best_id
+
+
 def _assign_frame_ids(items: list[dict], frames: list[dict]) -> None:
     if not frames:
         return
     for it in items:
-        c = _center(it["bbox"])
-        best = None
-        best_area = None
-        for fr in frames:
-            fb = fr["bbox"]
-            if _contains(fb, c):
-                area = (fb[2] - fb[0]) * (fb[3] - fb[1])
-                if best is None or area < best_area:
-                    best = fr
-                    best_area = area
-        if best is not None:
-            it["frame_id"] = best.get("id")
+        fid = _assign_frame_by_face_rule(it, frames)
+        if fid is not None:
+            it["frame_id"] = fid
+
+
+def _link_bodies_to_face_frames(
+    bodies: list[dict], faces: list[dict], frames: list[dict]
+) -> None:
+    """
+    Spanning body: prefer the frame_id of the nearest face that overlaps it.
+    Falls back to face-rule assignment already on the body.
+    """
+    if not bodies or not faces:
+        return
+    for body in bodies:
+        bb = body["bbox"]
+        best_face = None
+        best_d = None
+        bcx, bcy = _center(bb)
+        for face in faces:
+            fb = face["bbox"]
+            if _intersection_area(bb, fb) <= 0 and not _contains(bb, _center(fb)):
+                # face center inside body also counts
+                continue
+            fcx, fcy = _center(fb)
+            d = (fcx - bcx) ** 2 + (fcy - bcy) ** 2
+            if best_d is None or d < best_d:
+                best_d = d
+                best_face = face
+        # also: face center inside body bbox
+        if best_face is None:
+            for face in faces:
+                if _contains(bb, _center(face["bbox"])):
+                    best_face = face
+                    break
+        if best_face and best_face.get("frame_id"):
+            body["frame_id"] = best_face["frame_id"]
+            body["meta"] = dict(body.get("meta") or {})
+            body["meta"]["frame_from"] = "linked_face"
+            body["meta"]["linked_face_id"] = best_face.get("id")
 
 
 def detect_page(
@@ -116,9 +197,14 @@ def detect_page(
             }
         )
 
-    _assign_frame_ids(buckets["bodies"], buckets["frames"])
+    # Faces first: ぶち抜きは「顔が属するコマ」が一次帰属
     _assign_frame_ids(buckets["faces"], buckets["frames"])
+    _assign_frame_ids(buckets["bodies"], buckets["frames"])
     _assign_frame_ids(buckets["texts"], buckets["frames"])
+    # Body that spans panels: stick to nearest overlapping face's frame
+    _link_bodies_to_face_frames(
+        buckets["bodies"], buckets["faces"], buckets["frames"]
+    )
 
     return {
         "schema_version": SCHEMA_VERSION,

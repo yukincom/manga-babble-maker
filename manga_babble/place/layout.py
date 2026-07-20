@@ -312,7 +312,9 @@ def build_layout(
             slot_counter[fid_key] = slot_i + 1
             slot_xy = _SLOTS[slot_i % len(_SLOTS)]
 
-            min_hw, min_hh, max_hw, max_hh = size_from_text(str(line["text"]), w, h)
+            min_hw, min_hh, max_hw, max_hh = size_from_text(
+                str(line["text"]), w, h, shape=shape
+            )
             half_w = min(min_hw, max_hw)
             half_h = min(min_hh, max_hh)
 

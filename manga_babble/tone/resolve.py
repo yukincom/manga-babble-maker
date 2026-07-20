@@ -28,12 +28,19 @@ _TONE_ALIASES = {
 
 # Script trailing token → (canonical_shape, default_tone)
 # Keep this table small: one preferred name per look.
-# tone 名 (shout 等) は VALID_TONES 経由で _default_shape_for_tone に任せる。
+#
+# IMPORTANT (field survey): cloud / kumo is for bright・playful spoken voice,
+# NOT internal monologue (thought). Popular comics often do NOT use cloud
+# balloons for 心の声. Thought defaults to ellipse + trail dots.
 _SHAPE_TOKENS: dict[str, tuple[str, str]] = {
     "normal": ("ellipse", "normal"),
     "giza": ("jagged", "shout"),
-    "kumo": ("cloud", "thought"),
-    "thought": ("cloud", "thought"),
+    # 楽しい・明るい発話用雲（心の声ではない）
+    "fun-cloud": ("fun-cloud", "normal"),
+    "fun_cloud": ("fun-cloud", "normal"),
+    "kumo": ("fun-cloud", "normal"),  # legacy alias
+    "cloud": ("fun-cloud", "normal"),  # legacy alias
+    "thought": ("ellipse", "thought"),  # 心の声 → 楕円＋丸連なり
     "whisper": ("dashed-ellipse", "whisper"),
     "narration": ("v-rect", "narration"),
 }
@@ -149,7 +156,7 @@ def _default_shape_for_tone(tone: str) -> str:
         "normal": "ellipse",
         "shout": "jagged",
         "whisper": "dashed-ellipse",
-        "thought": "cloud",
+        "thought": "ellipse",  # not cloud; 心の声 is usually oval + dots
         "narration": "v-rect",
     }.get(tone, "ellipse")
 

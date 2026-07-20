@@ -1,10 +1,9 @@
-"""Raster speech-bubble layer (frame + tail only, no text).
+"""Raster speech-bubble layer.
 
-Sprint-now shapes (generic only; user templates for cloud/soft burst later):
-  normal / whisper : ellipse (+ short triangle tail; whisper dashed)
-  shout            : hard modest jagged, NO triangle tail
-  narration / note : rectangle, no tail
-  thought          : temporary ellipse + dots (cloud templates later)
+- ellipse / whisper: procedural
+- narration / v-rect: rectangle
+- cloud / jagged: templates from assets/shapes/ when present
+- page_margin: no frame
 """
 
 from __future__ import annotations
@@ -16,6 +15,11 @@ from typing import Any
 from PIL import Image, ImageDraw
 
 from manga_babble.schema import normalize_bbox
+from manga_babble.shapes.templates import (
+    fit_template_to_bbox,
+    load_template,
+    pick_template_path,
+)
 
 
 def _ellipse_pts(cx, cy, rx, ry, seed=0, n=48):
@@ -29,15 +33,10 @@ def _ellipse_pts(cx, cy, rx, ry, seed=0, n=48):
 
 
 def _hard_jagged_pts(cx, cy, rx, ry, seed=0, spikes=8, indent=0.22):
-    """
-    Hard (polygonal) jagged: angular ellipse + modest spikes.
-    Not an explosion mark — few spikes, moderate indent, tiny noise.
-    """
     rnd = random.Random(seed)
     pts = []
     for i in range(spikes * 2):
         t = math.pi * i / spikes
-        # outer tip / inner valley
         base_r = 1.0 if i % 2 == 0 else (1.0 - indent)
         r = base_r * (1 + rnd.uniform(-0.03, 0.03))
         pts.append((cx + rx * r * math.cos(t), cy + ry * r * math.sin(t)))
@@ -50,21 +49,18 @@ def _nearest_point_on_bbox(px, py, bbox):
 
 
 def _clamp_tail_target(cx, cy, rx, ry, target, max_len_ratio=0.45):
-    """Shorten tail tip so it does not spear across the page."""
     tx, ty = target
     dx, dy = tx - cx, ty - cy
     dist = math.hypot(dx, dy) or 1.0
-    # Start from ellipse edge
     edge = max(rx, ry) * 0.85
     max_len = max(rx, ry) * 2 * max_len_ratio
     if dist <= edge + 4:
         return tx, ty
-    # Point at most max_len beyond the bubble center toward target
     scale = min(1.0, (edge + max_len) / dist)
     return cx + dx * scale, cy + dy * scale
 
 
-def _draw_polygon(draw: ImageDraw.ImageDraw, pts, fill, outline, width, dashed=False):
+def _draw_polygon(draw, pts, fill, outline, width, dashed=False):
     if len(pts) < 3:
         return
     ip = [(int(round(x)), int(round(y))) for x, y in pts]
@@ -78,7 +74,24 @@ def _draw_polygon(draw: ImageDraw.ImageDraw, pts, fill, outline, width, dashed=F
         draw.line(ip + [ip[0]], fill=outline, width=width)
 
 
+def _try_paste_template(
+    img: Image.Image,
+    kind: str,
+    bbox: tuple[float, float, float, float],
+    seed: int,
+    template_id: str | None,
+) -> bool:
+    path = pick_template_path(kind, seed=seed, template_id=template_id)
+    if path is None:
+        return False
+    tmpl = load_template(str(path))
+    fitted, xy = fit_template_to_bbox(tmpl, bbox)
+    img.alpha_composite(fitted, dest=xy)
+    return True
+
+
 def _draw_one(
+    img: Image.Image,
     draw: ImageDraw.ImageDraw,
     bubble: dict[str, Any],
     stroke: int = 4,
@@ -86,19 +99,18 @@ def _draw_one(
     tone = bubble.get("tone") or "normal"
     meta = bubble.get("meta") or {}
     seed = int(meta.get("seed") or 0)
-    # shape = look; tone = role. Prefer shape when present.
     shape = (meta.get("shape") or "").replace("_", "-")
+    template_id = meta.get("template_id")
     x1, y1, x2, y2 = normalize_bbox(bubble["bubble_bbox"])
+    bbox = (x1, y1, x2, y2)
     cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
     rx, ry = max(1.0, (x2 - x1) / 2), max(1.0, (y2 - y1) / 2)
     face = bubble.get("speaker_face_bbox")
     placement = meta.get("placement") or ""
 
-    # ※ / page_margin: text only — no bubble frame
     if placement == "page_margin":
         return
 
-    # Rectangles by shape (narration boxes inside panels)
     if shape in ("rect", "v-rect", "tall-rect") or tone == "narration":
         draw.rectangle(
             [int(x1), int(y1), int(x2), int(y2)],
@@ -108,32 +120,43 @@ def _draw_one(
         )
         return
 
-    if shape in ("jagged",) or tone == "shout":
-        pts = _hard_jagged_pts(cx, cy, rx, ry, seed=seed)
-    else:
-        # ellipse / cloud(temp) / dashed-ellipse body
-        pts = _ellipse_pts(cx, cy, rx, ry, seed=seed)
+    # fun-cloud = bright・playful SPEECH (not 心の声)
+    use_fun_cloud = shape in ("fun-cloud", "cloud", "kumo")
+    use_jagged = shape in ("jagged",) or tone == "shout"
+    is_thought = tone == "thought"
 
-    dashed = shape == "dashed-ellipse" or tone == "whisper"
-    _draw_polygon(
-        draw,
-        pts,
-        fill=(255, 255, 255, 255),
-        outline=(0, 0, 0, 255),
-        width=stroke,
-        dashed=dashed,
-    )
-
-    # shout: no triangle tail (shape alone; user soft-burst templates later)
-    if tone == "shout" or face is None:
+    if use_fun_cloud:
+        if not _try_paste_template(img, "fun-cloud", bbox, seed, template_id):
+            pts = _ellipse_pts(cx, cy, rx, ry, seed=seed)
+            _draw_polygon(draw, pts, (255, 255, 255, 255), (0, 0, 0, 255), stroke)
+        if face is not None:
+            _draw_triangle_tail(draw, cx, cy, rx, ry, face, stroke)
         return
 
-    fx1, fy1, fx2, fy2 = normalize_bbox(face)
-    aim = (fx1, fy1, fx2, fy2 + (fy2 - fy1) * 0.3)
-    target = _nearest_point_on_bbox(cx, cy, aim)
-    target = _clamp_tail_target(cx, cy, rx, ry, target)
+    if use_jagged:
+        if _try_paste_template(img, "jagged", bbox, seed, template_id):
+            return  # no triangle tail on shout
+        pts = _hard_jagged_pts(cx, cy, rx, ry, seed=seed)
+        _draw_polygon(draw, pts, (255, 255, 255, 255), (0, 0, 0, 255), stroke)
+        return
 
-    if tone == "thought":
+    # ellipse / whisper / thought body
+    pts = _ellipse_pts(cx, cy, rx, ry, seed=seed)
+    dashed = shape == "dashed-ellipse" or tone == "whisper"
+    _draw_polygon(
+        draw, pts, (255, 255, 255, 255), (0, 0, 0, 255), stroke, dashed=dashed
+    )
+
+    if face is None:
+        return
+
+    if is_thought:
+        # 心の声: oval + trail of circles (not cloud template)
+        fx1, fy1, fx2, fy2 = normalize_bbox(face)
+        aim = (fx1, fy1, fx2, fy2 + (fy2 - fy1) * 0.3)
+        target = _clamp_tail_target(
+            cx, cy, rx, ry, _nearest_point_on_bbox(cx, cy, aim)
+        )
         for i, frac in enumerate((0.35, 0.58, 0.78)):
             bx = cx + (target[0] - cx) * frac
             by = cy + (target[1] - cy) * frac
@@ -146,7 +169,13 @@ def _draw_one(
             )
         return
 
-    # normal / whisper: short triangle tail
+    _draw_triangle_tail(draw, cx, cy, rx, ry, face, stroke)
+
+
+def _draw_triangle_tail(draw, cx, cy, rx, ry, face, stroke):
+    fx1, fy1, fx2, fy2 = normalize_bbox(face)
+    aim = (fx1, fy1, fx2, fy2 + (fy2 - fy1) * 0.3)
+    target = _clamp_tail_target(cx, cy, rx, ry, _nearest_point_on_bbox(cx, cy, aim))
     angle = math.atan2(target[1] - cy, target[0] - cx)
     base_x = cx + rx * 0.92 * math.cos(angle)
     base_y = cy + ry * 0.92 * math.sin(angle)
@@ -158,13 +187,7 @@ def _draw_one(
         (base_x - dx, base_y - dy),
         (target[0], target[1]),
     ]
-    _draw_polygon(
-        draw,
-        tri,
-        fill=(255, 255, 255, 255),
-        outline=(0, 0, 0, 255),
-        width=stroke,
-    )
+    _draw_polygon(draw, tri, (255, 255, 255, 255), (0, 0, 0, 255), stroke)
 
 
 def draw_bubble_layer(
@@ -176,7 +199,6 @@ def draw_bubble_layer(
 ) -> Image.Image:
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    ordered = sorted(bubbles, key=lambda b: b.get("order", 0))
-    for b in ordered:
-        _draw_one(draw, b, stroke=stroke_width)
+    for b in sorted(bubbles, key=lambda x: x.get("order", 0)):
+        _draw_one(img, draw, b, stroke=stroke_width)
     return img
