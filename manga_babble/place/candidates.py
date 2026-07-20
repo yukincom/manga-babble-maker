@@ -5,6 +5,9 @@ from __future__ import annotations
 import numpy as np
 import cv2
 
+# Font floor used when sizing bubbles so 12px text + 1ch margin fits.
+MIN_FONT_PX = 12.0
+
 
 def compute_bubble_candidates(
     frame_bbox,
@@ -18,10 +21,15 @@ def compute_bubble_candidates(
     min_half_h=30.0,
     max_half_w=None,
     max_half_h=None,
+    prefer_text_size: bool = True,
 ):
     """
     Return list of {bbox: (x1,y1,x2,y2), score: float} inside frame_bbox,
     avoiding body/face/extra occupied regions.
+
+    If prefer_text_size is True (default), bubble half-size is driven by
+    min_half_* (from text metrics), not by the free-space peak radius.
+    Free-space only chooses the *center* and rejects spots too tight to fit.
     """
     fx1, fy1, fx2, fy2 = map(float, frame_bbox)
     fw, fh = fx2 - fx1, fy2 - fy1
@@ -61,31 +69,47 @@ def compute_bubble_candidates(
         ] = 1
 
     px_per_unit = fw / res_x
-    half_w_ratio, half_h_ratio = 0.95, 0.8
+    # Need free radius (in mask units) to fit preferred half-size
+    need_r = max(min_half_w, min_half_h) / px_per_unit * 0.9
 
     results = []
     for _ in range(top_k):
         free = (1 - occupied).astype(np.uint8)
         dist = cv2.distanceTransform(free, cv2.DIST_L2, 5)
-        idx = np.unravel_index(np.argmax(dist), dist.shape)
-        peak_val = float(dist[idx])
+        # Mask out cells too small for the text-sized bubble
+        if prefer_text_size and need_r > 1:
+            fit = dist >= need_r
+            if not np.any(fit):
+                # relax: take global peak but still use text size (may clip)
+                idx = np.unravel_index(np.argmax(dist), dist.shape)
+                peak_val = float(dist[idx])
+            else:
+                masked = np.where(fit, dist, 0)
+                idx = np.unravel_index(np.argmax(masked), masked.shape)
+                peak_val = float(dist[idx])
+        else:
+            idx = np.unravel_index(np.argmax(dist), dist.shape)
+            peak_val = float(dist[idx])
+
         if peak_val <= 1:
             break
         cy, cx = idx
 
-        half_w_mask = peak_val * half_w_ratio
-        half_h_mask = peak_val * half_h_ratio
-        half_w = half_w_mask * px_per_unit
-        half_h = half_h_mask * px_per_unit
+        if prefer_text_size:
+            half_w = float(min_half_w)
+            half_h = float(min_half_h)
+        else:
+            half_w_ratio, half_h_ratio = 0.95, 0.8
+            half_w = peak_val * half_w_ratio * px_per_unit
+            half_h = peak_val * half_h_ratio * px_per_unit
+            half_w = max(half_w, min_half_w)
+            half_h = max(half_h, min_half_h)
 
-        half_w = max(half_w, min_half_w)
-        half_h = max(half_h, min_half_h)
         if max_half_w is not None:
             half_w = min(half_w, max_half_w)
         if max_half_h is not None:
             half_h = min(half_h, max_half_h)
 
-        # Recompute mask rect from clamped real size
         half_w_mask = half_w / px_per_unit
         half_h_mask = half_h / px_per_unit
         mx1, my1 = cx - half_w_mask, cy - half_h_mask
@@ -116,17 +140,24 @@ def compute_bubble_candidates(
 
 def size_from_text(text: str, page_w: float, page_h: float) -> tuple[float, float, float, float]:
     """
-    Estimate min/max half sizes from character count (vertical-manga friendly heuristic).
-    Returns (min_half_w, min_half_h, max_half_w, max_half_h).
+    Preferred half sizes from character count (vertical-friendly).
+
+    - Prefer single column when n < 12 (no wrap)
+    - ~1 character margin each side
+    - Sized so at least MIN_FONT_PX text can fit
     """
     n = max(1, len(str(text).replace("\n", "").replace(" ", "")))
-    # Rough: ~1 char ~ 22px tall in bubble, columns of ~6–10
-    cols = max(1, min(4, (n + 5) // 6))
-    rows = max(1, (n + cols - 1) // cols)
-    char_px = max(14.0, min(28.0, page_h / 50.0))
-    pad = char_px * 1.2
-    min_half_w = (cols * char_px + pad) / 2
-    min_half_h = (rows * char_px + pad) / 2
+    # Line-break policy: only consider multi-column if 12+ chars
+    if n < 12:
+        cols, rows = 1, n
+    else:
+        cols = max(1, min(4, (n + 5) // 6))
+        rows = max(1, (n + cols - 1) // cols)
+
+    char_px = max(MIN_FONT_PX, min(28.0, page_h / 50.0))
+    margin = char_px * 1.0  # one character padding each side
+    min_half_w = (cols * char_px + 2 * margin) / 2
+    min_half_h = (rows * char_px + 2 * margin) / 2
     max_half_w = page_w * 0.35
     max_half_h = page_h * 0.28
     min_half_w = min(min_half_w, max_half_w)

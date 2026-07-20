@@ -1,4 +1,11 @@
-"""Resolve bubble tone from explicit type or light text rules (no VLM)."""
+"""Resolve speech tone and bubble shape (kept as separate concepts).
+
+tone  = 役割・雰囲気（normal / shout / thought / whisper / narration）
+shape = 見た目（ellipse / jagged / cloud / dashed-ellipse / v-rect / …）
+
+台本の末尾トークンは主に shape 名（normal, giza, kumo, whisper, narration…）。
+「ナレーション」話者や ※ は tone=narration 側。
+"""
 
 from __future__ import annotations
 
@@ -7,8 +14,8 @@ from typing import Any
 
 from manga_babble.schema import VALID_TONES
 
-# Explicit aliases
-_ALIASES = {
+# True synonyms of tone only (not shapes)
+_TONE_ALIASES = {
     "scream": "shout",
     "yell": "shout",
     "think": "thought",
@@ -16,8 +23,19 @@ _ALIASES = {
     "inner": "thought",
     "narrate": "narration",
     "narr": "narration",
-    "box": "narration",
     "note": "narration",
+}
+
+# Script trailing token → (canonical_shape, default_tone)
+# Keep this table small: one preferred name per look.
+# tone 名 (shout 等) は VALID_TONES 経由で _default_shape_for_tone に任せる。
+_SHAPE_TOKENS: dict[str, tuple[str, str]] = {
+    "normal": ("ellipse", "normal"),
+    "giza": ("jagged", "shout"),
+    "kumo": ("cloud", "thought"),
+    "thought": ("cloud", "thought"),
+    "whisper": ("dashed-ellipse", "whisper"),
+    "narration": ("v-rect", "narration"),
 }
 
 
@@ -35,27 +53,105 @@ def is_page_margin_line(line: dict[str, Any]) -> bool:
 
 
 def resolve_tone(line: dict[str, Any]) -> tuple[str, str]:
-    """
-    Returns (tone, source) where source is explicit | rule | default.
-    """
-    if is_page_margin_line(line) and not (
-        line.get("type") and str(line.get("type")).strip()
-    ):
-        return "narration", "rule"
+    """Backward-compatible: returns (tone, source). Prefer resolve_style()."""
+    tone, _shape, source = resolve_style(line)
+    return tone, source
 
-    raw = line.get("type")
-    if raw is not None and str(raw).strip() != "":
-        t = str(raw).strip().lower()
-        t = _ALIASES.get(t, t)
-        if t not in VALID_TONES:
-            t = "normal"
-        return t, "explicit"
 
-    text = str(line.get("text") or "")
-    rule = _from_text(text)
-    if rule:
-        return rule, "rule"
-    return "normal", "default"
+def resolve_style(line: dict[str, Any]) -> tuple[str, str, str]:
+    """
+    Returns (tone, shape, source).
+
+    Priority:
+      1) explicit line["shape"]
+      2) line["type"] as tone synonym, tone name, or shape token
+      3) text / speaker rules
+      4) defaults
+    """
+    source = "default"
+    shape: str | None = None
+    tone: str | None = None
+
+    raw_shape = line.get("shape")
+    if raw_shape is not None and str(raw_shape).strip() != "":
+        key = _norm_token(raw_shape)
+        if key in _SHAPE_TOKENS:
+            shape, tone_from_shape = _SHAPE_TOKENS[key]
+            tone = tone_from_shape
+            source = "explicit"
+        else:
+            # Allow raw canonical shapes: ellipse, jagged, v-rect, …
+            shape = key
+            source = "explicit"
+
+    raw_type = line.get("type")
+    if raw_type is not None and str(raw_type).strip() != "":
+        key = _norm_token(raw_type)
+        source = "explicit"
+        if key in _TONE_ALIASES:
+            tone = _TONE_ALIASES[key]
+            if shape is None:
+                shape = _default_shape_for_tone(tone)
+        elif key in VALID_TONES:
+            tone = key
+            if shape is None:
+                shape = _default_shape_for_tone(tone)
+        elif key in _SHAPE_TOKENS:
+            s, tone_from_shape = _SHAPE_TOKENS[key]
+            shape = shape or s
+            if tone is None:
+                tone = tone_from_shape
+        else:
+            if tone is None:
+                tone = "normal"
+            if shape is None:
+                shape = "ellipse"
+
+    if is_page_margin_line(line):
+        if tone is None:
+            tone = "narration"
+            source = "rule" if source == "default" else source
+        if shape is None:
+            shape = "v-rect"
+
+    speaker = str(line.get("speaker") or "").strip()
+    if tone is None and speaker in ("ナレーション", "narration", "ナレ"):
+        tone = "narration"
+        shape = shape or "v-rect"
+        source = "rule"
+
+    if tone is None:
+        text = str(line.get("text") or "")
+        ruled = _from_text(text)
+        if ruled:
+            tone = ruled
+            source = "rule"
+            if shape is None:
+                shape = _default_shape_for_tone(tone)
+
+    if tone is None:
+        tone = "normal"
+    if shape is None:
+        shape = _default_shape_for_tone(tone)
+
+    if tone not in VALID_TONES:
+        tone = "normal"
+
+    return tone, shape, source
+
+
+def _norm_token(value: Any) -> str:
+    return str(value).strip().lower().replace(" ", "-").replace("_", "-")
+
+
+def _default_shape_for_tone(tone: str) -> str:
+    return {
+        "normal": "ellipse",
+        "shout": "jagged",
+        "whisper": "dashed-ellipse",
+        "thought": "cloud",
+        "narration": "v-rect",
+    }.get(tone, "ellipse")
 
 
 def _from_text(text: str) -> str | None:
@@ -66,24 +162,20 @@ def _from_text(text: str) -> str | None:
     if s.startswith("※") or s.startswith("*"):
         return "narration"
 
-    # Full-width / half-width parens often mark thought / aside
     if (s.startswith("（") and s.endswith("）")) or (
         s.startswith("(") and s.endswith(")")
     ):
         return "thought"
 
-    # Narration-ish markers
     if s.startswith("――") or s.startswith("──") or s.startswith("…『"):
         return "narration"
     if re.match(r"^[【\[]", s) and re.search(r"[】\]]$", s):
         return "narration"
 
-    # Whisper-ish
     if "（小声）" in s or "（囁" in s or "(whisper)" in s.lower():
         return "whisper"
 
     bangs = s.count("！") + s.count("!")
-    # Soft single bang stays normal; strong shout needs !! or more
     if bangs >= 2:
         return "shout"
 

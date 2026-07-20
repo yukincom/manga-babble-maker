@@ -84,15 +84,22 @@ def _draw_one(
     stroke: int = 4,
 ):
     tone = bubble.get("tone") or "normal"
-    seed = int((bubble.get("meta") or {}).get("seed") or 0)
+    meta = bubble.get("meta") or {}
+    seed = int(meta.get("seed") or 0)
+    # shape = look; tone = role. Prefer shape when present.
+    shape = (meta.get("shape") or "").replace("_", "-")
     x1, y1, x2, y2 = normalize_bbox(bubble["bubble_bbox"])
     cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
     rx, ry = max(1.0, (x2 - x1) / 2), max(1.0, (y2 - y1) / 2)
     face = bubble.get("speaker_face_bbox")
-    placement = (bubble.get("meta") or {}).get("placement") or ""
+    placement = meta.get("placement") or ""
 
-    # Rectangle: narration and page-margin notes
-    if tone in ("narration", "note") or placement == "page_margin":
+    # ※ / page_margin: text only — no bubble frame
+    if placement == "page_margin":
+        return
+
+    # Rectangles by shape (narration boxes inside panels)
+    if shape in ("rect", "v-rect", "tall-rect") or tone == "narration":
         draw.rectangle(
             [int(x1), int(y1), int(x2), int(y2)],
             fill=(255, 255, 255, 255),
@@ -101,13 +108,13 @@ def _draw_one(
         )
         return
 
-    if tone == "shout":
+    if shape in ("jagged",) or tone == "shout":
         pts = _hard_jagged_pts(cx, cy, rx, ry, seed=seed)
     else:
-        # normal, whisper, thought body (thought cloud templates later)
+        # ellipse / cloud(temp) / dashed-ellipse body
         pts = _ellipse_pts(cx, cy, rx, ry, seed=seed)
 
-    dashed = tone == "whisper"
+    dashed = shape == "dashed-ellipse" or tone == "whisper"
     _draw_polygon(
         draw,
         pts,

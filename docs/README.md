@@ -9,4 +9,6 @@
 | [implementation-open-questions.md](./implementation-open-questions.md) | **仮決め・未決・欲しい資料**（実装判断の正本） |
 | [bubble-shape-approach.md](./bubble-shape-approach.md) | **吹き出し形状**（素材 vs パラメータ vs ハイブリッド） |
 | [sprint-now.md](./sprint-now.md) | **いま実装する範囲**とコミット分割 |
+| [script-format.md](./script-format.md) | **人が書く台本記法**（page / コマ / 話者 / 形状） |
+| [sprint-text-frame.md](./sprint-text-frame.md) | **枠サイズ・12px・枠外・改行12字**（#18–#21） |
 | [json-schema-draft.md](./json-schema-draft.md) | 入出力 JSON スキーマ草案 |

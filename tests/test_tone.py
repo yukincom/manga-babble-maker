@@ -1,10 +1,30 @@
-from manga_babble.tone import resolve_tone
+from manga_babble.tone import resolve_style, resolve_tone
 
 
 def test_explicit_type():
     tone, src = resolve_tone({"text": "hello", "type": "shout"})
     assert tone == "shout"
     assert src == "explicit"
+
+
+def test_script_shape_tokens():
+    tone, shape, src = resolve_style({"text": "x", "type": "giza"})
+    assert tone == "shout" and shape == "jagged"
+
+    tone, shape, src = resolve_style({"text": "x", "type": "kumo"})
+    assert tone == "thought" and shape == "cloud"
+
+    tone, shape, src = resolve_style({"text": "2025年", "type": "narration"})
+    assert tone == "narration" and shape == "v-rect"
+    assert src == "explicit"
+
+
+def test_shape_field_separate_from_tone():
+    tone, shape, src = resolve_style(
+        {"text": "2025年", "type": "narration", "shape": "v-rect"}
+    )
+    assert tone == "narration"
+    assert shape == "v-rect"
 
 
 def test_rule_thought_parens():

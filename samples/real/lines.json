@@ -7,71 +7,68 @@
   },
   "lines": [
     {
-      "id": "l1",
+      "id": "l0",
       "text": "やっと正月だー！",
       "order": 0,
-      "speaker": "face1",
-      "type": "shout",
-      "frame_id": "f2"
+      "speaker": "小雪",
+      "type": "giza",
+      "panel_index": 1
     },
     {
-      "id": "l2",
+      "id": "l1",
       "text": "2025年",
       "order": 1,
       "speaker": null,
       "type": "narration",
-      "frame_id": "f2"
+      "panel_index": 1
+    },
+    {
+      "id": "l2",
+      "text": "たまにはツイッター…",
+      "order": 2,
+      "speaker": "小雪",
+      "type": "normal",
+      "panel_index": 2
     },
     {
       "id": "l3",
-      "text": "たまにはツイッター",
-      "order": 2,
-      "speaker": "face1",
+      "text": "今はXだっけ",
+      "order": 3,
+      "speaker": "小雪",
       "type": "normal",
-      "frame_id": "f1"
+      "panel_index": 2
     },
     {
       "id": "l4",
-      "text": "今はXだっけ",
-      "order": 3,
-      "speaker": "face2",
-      "type": "thought",
-      "frame_id": "f1"
+      "text": "ん？",
+      "order": 4,
+      "speaker": "小雪",
+      "type": "normal",
+      "panel_index": 3
     },
     {
       "id": "l5",
-      "text": "ん？",
-      "order": 4,
-      "speaker": "face0",
+      "text": "なんだこれ",
+      "order": 5,
+      "speaker": "小雪",
       "type": "normal",
-      "frame_id": "f0"
+      "panel_index": 3
     },
     {
       "id": "l6",
-      "text": "なんだこれ",
-      "order": 5,
-      "speaker": "face0",
+      "text": "見慣れぬアイコン・・・",
+      "order": 6,
+      "speaker": "小雪",
       "type": "normal",
-      "frame_id": "f0"
+      "panel_index": 4
     },
     {
       "id": "l7",
-      "text": "見慣れぬアイコン・・・",
-      "order": 6,
-      "speaker": "face0",
-      "type": "thought",
-      "frame_id": "f0"
-    },
-    {
-      "id": "l8",
       "text": "※ロゴは実際のものと異なります",
       "order": 7,
-      "speaker": null,
-      "type": null
+      "type": "narration",
+      "meta": { "placement": "page_margin" }
     }
   ],
-  "options": {
-    "style": "default",
-    "seed": 0
-  }
+  "options": { "style": "default", "seed": 0 }
 }

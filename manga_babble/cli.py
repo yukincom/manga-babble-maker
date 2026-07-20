@@ -84,9 +84,21 @@ def cmd_render(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    lines_path = args.lines
+    if args.script:
+        from manga_babble.script_parse import parse_script_file
+        from manga_babble.schema import save_json
+
+        doc = parse_script_file(args.script)
+        out_lines = Path(args.out_dir) / "lines_from_script.json"
+        Path(args.out_dir).mkdir(parents=True, exist_ok=True)
+        save_json(out_lines, doc)
+        lines_path = str(out_lines)
+    if not lines_path:
+        raise ValueError("either --lines or --script is required")
     manifest = run_pipeline(
         args.image,
-        args.lines,
+        lines_path,
         args.out_dir,
         model_path=args.model,
         conf_threshold=args.conf,
@@ -95,6 +107,26 @@ def cmd_run(args: argparse.Namespace) -> int:
         detections=args.detections,
     )
     _print_json(manifest)
+    return 0
+
+
+def cmd_parse_script(args: argparse.Namespace) -> int:
+    from manga_babble.script_parse import parse_script_file
+    from manga_babble.schema import save_json
+
+    doc = parse_script_file(args.script)
+    if args.out:
+        save_json(args.out, doc)
+        _print_json(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "status": "ok",
+                "files": {"lines": str(Path(args.out).resolve())},
+                "errors": [],
+            }
+        )
+    else:
+        _print_json(doc)
     return 0
 
 
@@ -133,7 +165,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = sub.add_parser("run", help="detect (optional skip) + place + render")
     run.add_argument("--image", required=True)
-    run.add_argument("--lines", required=True)
+    run.add_argument("--lines", help="lines JSON path")
+    run.add_argument("--script", help="human script.txt (converted to lines)")
     run.add_argument("--out-dir", required=True)
     run.add_argument(
         "--model",
@@ -147,6 +180,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--no-preview", action="store_true")
     run.set_defaults(func=cmd_run)
+
+    ps = sub.add_parser("parse-script", help="Parse script.txt → lines.json")
+    ps.add_argument("--script", required=True)
+    ps.add_argument("--out", help="Write lines JSON")
+    ps.set_defaults(func=cmd_parse_script)
 
     return p
 

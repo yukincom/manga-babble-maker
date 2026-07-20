@@ -1,4 +1,12 @@
-"""Raster text layer only (no bubble frame). Simple vertical-friendly layout."""
+"""Raster text preview — dense packing, not spread across the whole bubble.
+
+Rules:
+  - Font size >= 12px
+  - Wrap / multi-column only if len >= 12
+  - Vertical: top→bottom, columns right→left
+  - ~1 character margin inside bubble
+  - Glyphs stacked with ~1.05 * size pitch (not frame-height / n)
+"""
 
 from __future__ import annotations
 
@@ -8,9 +16,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 from manga_babble.schema import normalize_bbox
 
+MIN_FONT_PX = 12
+
 
 def _load_font(size: int) -> ImageFont.ImageFont:
-    # Prefer common JP-capable fonts on macOS; fall back to default.
     candidates = [
         "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
         "/System/Library/Fonts/Hiragino Sans GB.ttc",
@@ -26,18 +35,8 @@ def _load_font(size: int) -> ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
-def _vertical_chars(text: str) -> list[str]:
-    # Keep newlines as column breaks
-    cols: list[list[str]] = [[]]
-    for ch in text:
-        if ch == "\n":
-            cols.append([])
-            continue
-        if ch in (" ", "\t"):
-            continue
-        cols[-1].append(ch)
-    # Manga vertical: columns right-to-left
-    return cols
+def _chars(text: str) -> list[str]:
+    return [ch for ch in text if ch not in (" ", "\t", "\n")]
 
 
 def draw_text_layer(
@@ -54,36 +53,54 @@ def draw_text_layer(
             continue
         x1, y1, x2, y2 = normalize_bbox(b["bubble_bbox"])
         bw, bh = max(1.0, x2 - x1), max(1.0, y2 - y1)
-        # Font size from bubble height / char rows estimate
-        n = max(1, len(text.replace("\n", "").replace(" ", "")))
-        cols = max(1, min(4, (n + 5) // 6))
-        rows = max(1, (n + cols - 1) // cols)
-        size = int(min(bh / (rows + 1.5), bw / (cols + 1.0), 36))
-        size = max(10, size)
+        chars = _chars(text)
+        n = max(1, len(chars))
+
+        # Font: prefer ~14–18, never below 12; fit if bubble is small
+        size = MIN_FONT_PX
+        pitch = size * 1.08
+        margin = float(size)  # 1 character margin
+
+        if n < 12:
+            cols_n, rows_n = 1, n
+        else:
+            rows_n = max(6, int((bh - 2 * margin) / pitch))
+            cols_n = max(1, (n + rows_n - 1) // rows_n)
+
+        # Grow font if room (still dense packing)
+        avail_h = max(1.0, bh - 2 * margin)
+        avail_w = max(1.0, bw - 2 * margin)
+        fit = int(min(avail_h / max(rows_n, 1), avail_w / max(cols_n, 1), 22))
+        size = max(MIN_FONT_PX, min(fit, 22))
+        pitch = size * 1.08
+        margin = float(size)
         font = _load_font(size)
 
-        columns = _vertical_chars(text)
-        # If single long column, split by rows capacity
-        if len(columns) == 1 and len(columns[0]) > rows + 2:
-            chars = columns[0]
-            columns = []
-            for i in range(0, len(chars), rows):
-                columns.append(chars[i : i + rows])
+        # Column-major: fill top→bottom, then next column to the left
+        columns: list[list[str]] = []
+        if n < 12:
+            columns = [chars]
+        else:
+            rows_n = max(1, int((bh - 2 * margin) / pitch))
+            for i in range(0, n, rows_n):
+                columns.append(chars[i : i + rows_n])
 
-        col_w = bw / (len(columns) + 1)
-        # Right-to-left columns
+        # Start from top of inner box; rightmost column first
+        inner_top = y1 + margin
+        inner_right = x2 - margin
+        col_gap = size * 1.15
+
         for ci, col in enumerate(reversed(columns)):
-            cx = x2 - col_w * (ci + 1)
+            cx = inner_right - ci * col_gap - size * 0.5
             for ri, ch in enumerate(col):
-                cy = y1 + (bh * (ri + 1)) / (len(col) + 1)
-                # Center glyph roughly
+                cy = inner_top + ri * pitch
                 try:
-                    bbox = draw.textbbox((0, 0), ch, font=font)
-                    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                    tb = draw.textbbox((0, 0), ch, font=font)
+                    tw, th = tb[2] - tb[0], tb[3] - tb[1]
                 except Exception:
                     tw, th = size, size
                 draw.text(
-                    (cx - tw / 2, cy - th / 2),
+                    (cx - tw / 2, cy),
                     ch,
                     fill=(0, 0, 0, 255),
                     font=font,
