@@ -369,6 +369,7 @@ def build_layout(
         "schema_version": SCHEMA_VERSION,
         "page": page,
         "bubbles": bubbles,
+        "options": dict(lines_doc.get("options") or {}),
         "meta": {
             "frames_reading_order": [f.get("id") for f in frames_ordered],
         },

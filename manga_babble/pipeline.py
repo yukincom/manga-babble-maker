@@ -70,8 +70,9 @@ def run_render(
     Path(out_dir).mkdir(parents=True, exist_ok=True)
 
     bubbles = lay.get("bubbles") or []
+    options = lay.get("options") or {}
     bubble_img = draw_bubble_layer(w, h, bubbles)
-    text_img = draw_text_layer(w, h, bubbles)
+    text_img = draw_text_layer(w, h, bubbles, options=options)
     bubble_img.save(paths["bubble_layer"])
     text_img.save(paths["text_layer"])
     save_json(paths["layout_json"], lay)
