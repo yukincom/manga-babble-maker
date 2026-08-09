@@ -70,3 +70,13 @@ preview.svg
 .cache/
 huggingface/
 *.hf_cache/
+
+# Clip Studio editable source files, unless intentionally published
+assets/shapes/**/*.clip
+
+# Local real-page experiment artifacts
+samples/real/detections*.json
+samples/real/page_lines.png
+samples/real/here_*.jpg
+samples/real/page[0-9]*.jpg
+samples/real/*指定あり*.jpg

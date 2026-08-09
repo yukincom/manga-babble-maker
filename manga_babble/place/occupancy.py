@@ -1,8 +1,11 @@
-"""Dual-path occupancy for color ネーム pages.
+"""Dual-path occupancy for color ネーム / guide-painted pages.
 
 Path A (detect):  color → extract black lines → B&W line art → RT-DETR
-Path B (occupy):  color → chromatic fill mask (person paint) → HARD free-space
-Merge:            place uses faces from A + occupancy from B; body AABB ignored.
+Path B (occupy):  chromatic fill (pink person / blue "don't cover" guides) + face pads
+Merge:            faces from A for aim + HARD; occupancy from B; body AABB ignored.
+
+Color HARD does **not** use raw dark-pixel line_ink (black flats / tones are free).
+Panel borders are handled by frame inset in place, not full-page ink.
 
 Mono pages fall back to ink-envelope occupancy.
 """
@@ -103,7 +106,12 @@ def extract_line_ink_mask(
     line_thresh: int = 80,
     dilate_iter: int = 1,
 ) -> np.ndarray:
-    """Optional: thickened black lines also hard (don't cover ink)."""
+    """
+    Dark pixels as mask (legacy / mono helpers).
+
+    **Not used for color occupancy** — gray&lt;thr treats 黒ベタ背景 as ink (#40).
+    Kept for experiments and mono fallback helpers only.
+    """
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
     ink = (gray < int(line_thresh)).astype(np.uint8) * 255
     if dilate_iter > 0:
@@ -212,18 +220,26 @@ def build_occupancy_color(
     frame_bboxes: list[tuple] | None = None,
     *,
     face_pad_ratio: float = 0.12,
-    include_lines: bool = True,
+    include_lines: bool = False,
 ) -> np.ndarray:
     """
-    HARD occupancy from person paint (+ optional line ink) + face pads.
-    Body detector boxes are not used.
+    HARD occupancy for color pages (#40):
+
+      - chromatic fill (person pink / guide blue) — required
+      - face pads (red boxes; also used for tail aim elsewhere)
+      - frame border strip cleared so 枠線上に貼り付かない
+
+    ``line_ink_mask`` is ignored unless ``include_lines=True`` (discouraged;
+    black flats become false HARD). Body detector AABBs are not used.
     """
     occ = fill_mask.copy()
     if include_lines and line_ink_mask is not None:
+        # Legacy escape hatch only — do not enable for manga black skies
         occ = np.maximum(occ, line_ink_mask)
     if face_bboxes:
         padded = face_margin_boxes(face_bboxes, pad_ratio=face_pad_ratio, pad_min=4.0)
         occ = stamp_boxes_on_mask(occ, padded)
+    # Free the panel border strip (コマ枠). Placement also insets from frame.
     occ = clear_frame_borders(occ, frame_bboxes, border_px=5)
     return occ
 

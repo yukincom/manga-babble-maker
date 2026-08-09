@@ -44,3 +44,48 @@ def test_reading_order_bottom_row_rtl():
     ]
     ordered = frames_in_reading_order(frames)
     assert [f["id"] for f in ordered] == ["top", "right", "left"]
+
+
+def test_narration_does_not_consume_speech_slot_zero():
+    """#41: ナレのあとの発話は①右上（ゼロ番をナレが食わない）。"""
+    det = {
+        "schema_version": 1,
+        "page": {"width": 1000, "height": 800},
+        "detections": {
+            "frames": [{"id": "f0", "bbox": [0, 0, 1000, 800], "score": 1}],
+            "faces": [
+                {"id": "fa", "bbox": [100, 400, 250, 550], "frame_id": "f0"},
+            ],
+            "bodies": [],
+            "texts": [],
+        },
+    }
+    lines = {
+        "schema_version": 1,
+        "lines": [
+            {
+                "id": "n",
+                "text": "2025年",
+                "order": 0,
+                "panel_index": 1,
+                "type": "narration",
+            },
+            {
+                "id": "s",
+                "text": "やっと　正月だー！",
+                "order": 1,
+                "panel_index": 1,
+                "type": "normal",
+            },
+        ],
+    }
+    lay = build_layout(det, lines)
+    narr, speech = lay["bubbles"][0], lay["bubbles"][1]
+    assert narr["meta"].get("speech_slot") is None
+    assert speech["meta"].get("speech_slot") == 0
+    # Speech preferred ①: center further right than narration (② TL bias)
+    nsx = (narr["bubble_bbox"][0] + narr["bubble_bbox"][2]) / 2
+    ssx = (speech["bubble_bbox"][0] + speech["bubble_bbox"][2]) / 2
+    assert ssx > nsx
+    # Speech in right half of frame
+    assert ssx > 500

@@ -804,13 +804,14 @@ def build_layout(
             color_prep = None
 
     if color_prep and color_prep.get("has_color") and color_prep.get("fill_mask") is not None:
+        # #40: color HARD = paint fill + faces only (no line_ink / 黒ベタ)
         page_occupancy = build_occupancy_color(
             color_prep["fill_mask"],
-            line_ink_mask=color_prep.get("line_ink_mask"),
+            line_ink_mask=None,
             face_bboxes=face_bbs,
             frame_bboxes=frame_bbs,
             face_pad_ratio=0.12,
-            include_lines=True,
+            include_lines=False,
         )
         occupancy_mode = "color_fill"
         # User rule: ignore detector body boxes when fill mask drives free space
@@ -853,8 +854,21 @@ def build_layout(
                 line, frames, frames_ordered, page_bbox
             )
             fid_key = frame_id or "_page"
-            slot_i = slot_counter.get(fid_key, 0)
-            slot_counter[fid_key] = slot_i + 1
+
+            # Speech slots ①TR→②TL… only (#41).
+            # Narration must NOT consume slot 0 — first dialogue stays 右上.
+            is_narr = tone == "narration" or shape in (
+                "v-rect",
+                "tall-rect",
+                "rect",
+            )
+            if is_narr:
+                slot_i = 0  # aim heuristics only; not a speech order index
+                prefer_slot = 1  # ナレは左上寄り（①は発話用）
+            else:
+                slot_i = slot_counter.get(fid_key, 0)
+                slot_counter[fid_key] = slot_i + 1
+                prefer_slot = slot_i
 
             # Size from the same chunks render will use (agent　 /  structural)
             text_chunks = split_text_to_chunks(
@@ -870,6 +884,7 @@ def build_layout(
             half_h = min(min_hh, max_hh)
             meta_extra["text_chunks"] = text_chunks
             meta_extra["n_cols"] = len(text_chunks)
+            meta_extra["speech_slot"] = None if is_narr else slot_i
 
             # Aim: faces ∪ anchors (#36). Speaker name / explicit id / R3 heuristics
             want_tail = tone not in ("narration", "shout") and shape not in (
@@ -892,10 +907,8 @@ def build_layout(
             # Placement ranking uses preferred SLOT only (TR→TL…).
             # Do NOT pull bubble center toward face — that sank 「ん？」 to the
             # lower free pocket beside the head. Tails still aim via resolve_aim.
-            prefer_slot = slot_i
             prefer_near = None
-            if tone == "narration":
-                prefer_slot = 1 if slot_i == 0 else slot_i
+            if is_narr:
                 prefer_near = _center(
                     _slot_bbox(frame_bbox, _SLOTS[prefer_slot % len(_SLOTS)], half_w, half_h)
                 )

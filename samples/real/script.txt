@@ -1,9 +1,10 @@
 page1
 [１]
 
+ナレーション "2025年" narration
+
 小雪 "やっと　正月だー！" fun-cloud
 
-ナレーション "2025年" narration
 
 [２]
 

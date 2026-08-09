@@ -51,16 +51,38 @@ def test_fill_mask_marks_pink_not_white_corner():
 
 
 def test_occupancy_uses_fill_not_whole_box():
-    from manga_babble.place.occupancy import extract_line_ink_mask
-
     img = _make_pink_name()
     fill = extract_person_fill_mask(img)
-    line_ink = extract_line_ink_mask(img)
+    # #40: no line_ink — fill + face only
     occ = build_occupancy_color(
-        fill, line_ink_mask=line_ink, face_bboxes=[(55, 45, 90, 80)]
+        fill, face_bboxes=[(55, 45, 90, 80)], include_lines=False
     )
     free = (140, 40, 180, 100)
     assert region_ink_fraction(occ, free) < 0.15
     assert not hits_occupancy(occ, free, max_frac=0.15)
     on_pink = (60, 80, 100, 140)
     assert hits_occupancy(occ, on_pink, max_frac=0.15)
+
+
+def test_black_flat_background_is_not_hard():
+    """Night-sky style black flat must stay free (#40). Only chroma fill is HARD."""
+    import cv2
+
+    h, w = 200, 200
+    img = np.zeros((h, w, 3), dtype=np.uint8)  # black flat sky
+    # pink person blob
+    img[40:160, 30:90] = (221, 207, 255)
+    cv2.rectangle(img, (10, 10), (190, 190), (0, 0, 0), 2)
+    fill = extract_person_fill_mask(img, dilate_iter=1)
+    occ = build_occupancy_color(
+        fill,
+        face_bboxes=[(40, 50, 80, 90)],
+        frame_bboxes=[(10, 10, 190, 190)],
+        include_lines=False,
+    )
+    # black sky on the right — free
+    sky = (120, 40, 180, 100)
+    assert region_ink_fraction(occ, sky) < 0.12
+    assert not hits_occupancy(occ, sky, max_frac=0.12)
+    # pink still hard
+    assert hits_occupancy(occ, (45, 70, 75, 130), max_frac=0.12)
