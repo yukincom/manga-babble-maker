@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "page": {
+    "image_path": "samples/name/page.png",
+    "width": 2150,
+    "height": 3035
+  },
+  "detections": {
+    "bodies": [
+      {
+        "id": "b0",
+        "bbox": [
+          348.57,
+          409.81,
+          803.17,
+          912.24
+        ],
+        "score": 0.6567,
+        "frame_id": "f2",
+        "meta": {
+          "frame_from": "linked_face",
+          "linked_face_id": "face0"
+        }
+      },
+      {
+        "id": "b1",
+        "bbox": [
+          940.82,
+          1227.78,
+          1638.62,
+          1712.16
+        ],
+        "score": 0.5561,
+        "frame_id": "f3"
+      },
+      {
+        "id": "b2",
+        "bbox": [
+          1182.65,
+          1947.19,
+          1749.74,
+          2809.17
+        ],
+        "score": 0.5092,
+        "frame_id": "f0",
+        "meta": {
+          "frame_from": "linked_face",
+          "linked_face_id": "face1"
+        }
+      },
+      {
+        "id": "b3",
+        "bbox": [
+          1187.59,
+          1948.29,
+          1747.4,
+          2457.42
+        ],
+        "score": 0.4634,
+        "frame_id": "f0",
+        "meta": {
+          "frame_from": "linked_face",
+          "linked_face_id": "face1"
+        }
+      }
+    ],
+    "texts": [],
+    "frames": [
+      {
+        "id": "f0",
+        "bbox": [
+          829.64,
+          1762.54,
+          1954.8,
+          2817.88
+        ],
+        "score": 0.9767
+      },
+      {
+        "id": "f1",
+        "bbox": [
+          194.31,
+          1762.29,
+          793.88,
+          2815.13
+        ],
+        "score": 0.9741
+      },
+      {
+        "id": "f2",
+        "bbox": [
+          195.28,
+          222.31,
+          1954.81,
+          926.98
+        ],
+        "score": 0.9735
+      },
+      {
+        "id": "f3",
+        "bbox": [
+          192.79,
+          974.51,
+          1954.87,
+          1718.44
+        ],
+        "score": 0.9007
+      }
+    ],
+    "faces": [
+      {
+        "id": "face0",
+        "bbox": [
+          443.61,
+          558.31,
+          726.4,
+          798.11
+        ],
+        "score": 0.4709,
+        "frame_id": "f2"
+      },
+      {
+        "id": "face1",
+        "bbox": [
+          1209.11,
+          2039.45,
+          1706.07,
+          2446.09
+        ],
+        "score": 0.3781,
+        "frame_id": "f0"
+      }
+    ]
+  },
+  "model": {
+    "name": "rtdetrv4-x-manga109s_v2",
+    "path": "models/rtdetrv4-x-manga109s_v2/model.onnx",
+    "conf_threshold": 0.35
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "page": {
+    "width": 1000,
+    "height": 800,
+    "id": "structure_demo"
+  },
+  "bubbles": [
+    {
+      "id": "bub_l0",
+      "line_id": "l0",
+      "text": "右から話すよ",
+      "tone": "normal",
+      "order": 0,
+      "bubble_bbox": [
+        695.63,
+        81.11,
+        765.23,
+        209.11
+      ],
+      "speaker_face_id": "a_right",
+      "speaker_face_bbox": [
+        680.0,
+        220.0,
+        820.0,
+        380.0
+      ],
+      "frame_id": "f0",
+      "score": 8.0,
+      "meta": {
+        "tone_source": "explicit",
+        "char_count": 6,
+        "seed": 0,
+        "shape": "ellipse",
+        "text_chunks": [
+          "右から話すよ"
+        ],
+        "n_cols": 1,
+        "placement_mode": "slot",
+        "slot_index": 0,
+        "overlap_face": false,
+        "size_scale": 1.0,
+        "tail_from": "anchor",
+        "aim_source": "anchor"
+      }
+    },
+    {
+      "id": "bub_l1",
+      "line_id": "l1",
+      "text": "左のセリフだ",
+      "tone": "normal",
+      "order": 1,
+      "bubble_bbox": [
+        230.74,
+        134.02,
+        310.74,
+        230.02
+      ],
+      "speaker_face_id": "a_left",
+      "speaker_face_bbox": [
+        160.0,
+        240.0,
+        300.0,
+        400.0
+      ],
+      "frame_id": "f0",
+      "score": 8.0,
+      "meta": {
+        "tone_source": "explicit",
+        "char_count": 6,
+        "seed": 1,
+        "shape": "ellipse",
+        "text_chunks": [
+          "左の",
+          "セリフだ"
+        ],
+        "n_cols": 2,
+        "placement_mode": "slot",
+        "slot_index": 1,
+        "overlap_face": false,
+        "size_scale": 1.0,
+        "tail_from": "anchor",
+        "aim_source": "anchor"
+      }
+    }
+  ],
+  "options": {
+    "style": "default",
+    "seed": 0
+  },
+  "meta": {
+    "frames_reading_order": [
+      "f0"
+    ]
+  }
+}

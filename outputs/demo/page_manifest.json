@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "status": "ok",
+  "page": {
+    "image_path": null,
+    "width": 1000,
+    "height": 1400
+  },
+  "files": {
+    "art": null,
+    "bubble_layer": "outputs/demo/page_bubble.png",
+    "text_layer": "outputs/demo/page_text.png",
+    "layout_json": "outputs/demo/page_layout.json",
+    "preview": "outputs/demo/page_preview.png"
+  },
+  "bubbles": [
+    {
+      "id": "bub_l1",
+      "line_id": "l1",
+      "text": "なんだと！？",
+      "tone": "shout",
+      "order": 0,
+      "bubble_bbox": [
+        353.09,
+        106.22,
+        934.91,
+        596.18
+      ],
+      "speaker_face_bbox": [
+        150.0,
+        600.0,
+        300.0,
+        750.0
+      ]
+    },
+    {
+      "id": "bub_l2",
+      "line_id": "l2",
+      "text": "ふざけるな！！",
+      "tone": "shout",
+      "order": 1,
+      "bubble_bbox": [
+        50.96,
+        71.84,
+        315.44,
+        294.56
+      ],
+      "speaker_face_bbox": [
+        680.0,
+        700.0,
+        820.0,
+        830.0
+      ]
+    },
+    {
+      "id": "bub_l3",
+      "line_id": "l3",
+      "text": "（……そうか）",
+      "tone": "thought",
+      "order": 2,
+      "bubble_bbox": [
+        50.24,
+        342.56,
+        287.36,
+        542.24
+      ],
+      "speaker_face_bbox": [
+        150.0,
+        600.0,
+        300.0,
+        750.0
+      ]
+    }
+  ],
+  "errors": []
+}

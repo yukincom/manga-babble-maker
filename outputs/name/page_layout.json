@@ -1,0 +1,303 @@
+{
+  "schema_version": 1,
+  "page": {
+    "image_path": "samples/name/page.png",
+    "width": 1488,
+    "height": 2105
+  },
+  "bubbles": [
+    {
+      "id": "bub_l0",
+      "line_id": "l0",
+      "text": "やっと　正月だー！",
+      "tone": "normal",
+      "order": 0,
+      "bubble_bbox": [
+        947.48,
+        294.53,
+        1109.88,
+        490.53
+      ],
+      "speaker_face_id": "face0",
+      "speaker_face_bbox": [
+        329.93,
+        455.36,
+        568.69,
+        663.66
+      ],
+      "frame_id": "f2",
+      "score": 8.0,
+      "meta": {
+        "tone_source": "explicit",
+        "char_count": 9,
+        "seed": 0,
+        "shape": "fun-cloud",
+        "text_chunks": [
+          "やっと",
+          "正月だー！"
+        ],
+        "n_cols": 2,
+        "placement_mode": "slot",
+        "slot_index": 0,
+        "overlap_face": false,
+        "size_scale": 1.0,
+        "occupancy": "ink",
+        "occupancy_mode": "color_fill",
+        "tail_from": "face",
+        "aim_source": "face"
+      }
+    },
+    {
+      "id": "bub_l1",
+      "line_id": "l1",
+      "text": "2025年",
+      "tone": "narration",
+      "order": 1,
+      "bubble_bbox": [
+        575.94,
+        294.53,
+        659.94,
+        490.53
+      ],
+      "speaker_face_id": null,
+      "speaker_face_bbox": null,
+      "frame_id": "f2",
+      "score": 8.0,
+      "meta": {
+        "tone_source": "explicit",
+        "char_count": 5,
+        "seed": 1,
+        "shape": "v-rect",
+        "text_chunks": [
+          "2025年"
+        ],
+        "n_cols": 1,
+        "placement_mode": "slot",
+        "slot_index": 1,
+        "overlap_face": false,
+        "size_scale": 1.0,
+        "occupancy": "ink",
+        "occupancy_mode": "color_fill"
+      }
+    },
+    {
+      "id": "bub_l2",
+      "line_id": "l2",
+      "text": "たまには　ツイッター…",
+      "tone": "normal",
+      "order": 2,
+      "bubble_bbox": [
+        1070.84,
+        746.64,
+        1233.24,
+        970.64
+      ],
+      "speaker_face_id": "face1",
+      "speaker_face_bbox": [
+        968.93,
+        916.8,
+        1064.93,
+        1006.75
+      ],
+      "frame_id": "f3",
+      "score": 8.0,
+      "meta": {
+        "tone_source": "explicit",
+        "char_count": 11,
+        "seed": 2,
+        "shape": "ellipse",
+        "text_chunks": [
+          "たまには",
+          "ツイッター…"
+        ],
+        "n_cols": 2,
+        "placement_mode": "slot",
+        "slot_index": 0,
+        "overlap_face": false,
+        "size_scale": 1.0,
+        "occupancy": "ink",
+        "occupancy_mode": "color_fill",
+        "tail_from": "face",
+        "aim_source": "face"
+      }
+    },
+    {
+      "id": "bub_l3",
+      "line_id": "l3",
+      "text": "今は　Xだっけ",
+      "tone": "normal",
+      "order": 3,
+      "bubble_bbox": [
+        627.61,
+        800.21,
+        767.61,
+        968.21
+      ],
+      "speaker_face_id": null,
+      "speaker_face_bbox": null,
+      "frame_id": "f3",
+      "score": 8.0,
+      "meta": {
+        "tone_source": "explicit",
+        "char_count": 7,
+        "seed": 3,
+        "shape": "ellipse",
+        "text_chunks": [
+          "今は",
+          "Xだっけ"
+        ],
+        "n_cols": 2,
+        "placement_mode": "free_space",
+        "slot_index": 1,
+        "overlap_face": false,
+        "size_scale": 1.0,
+        "occupancy": "ink",
+        "occupancy_mode": "color_fill"
+      }
+    },
+    {
+      "id": "bub_l4",
+      "line_id": "l4",
+      "text": "ん？",
+      "tone": "normal",
+      "order": 4,
+      "bubble_bbox": [
+        1115.9,
+        1239.55,
+        1218.94,
+        1351.55
+      ],
+      "speaker_face_id": "face2",
+      "speaker_face_bbox": [
+        822.17,
+        1361.6,
+        1129.57,
+        1609.86
+      ],
+      "frame_id": "f0",
+      "score": 8.0,
+      "meta": {
+        "tone_source": "explicit",
+        "char_count": 2,
+        "seed": 4,
+        "shape": "ellipse",
+        "text_chunks": [
+          "ん？"
+        ],
+        "n_cols": 1,
+        "placement_mode": "slot",
+        "slot_index": 0,
+        "overlap_face": false,
+        "size_scale": 1.0,
+        "occupancy": "ink",
+        "occupancy_mode": "color_fill",
+        "tail_from": "face",
+        "aim_source": "face"
+      }
+    },
+    {
+      "id": "bub_l5",
+      "line_id": "l5",
+      "text": "なんだ　これ",
+      "tone": "shout",
+      "order": 5,
+      "bubble_bbox": [
+        626.81,
+        1231.68,
+        814.97,
+        1427.68
+      ],
+      "speaker_face_id": null,
+      "speaker_face_bbox": null,
+      "frame_id": "f0",
+      "score": 8.0,
+      "meta": {
+        "tone_source": "explicit",
+        "char_count": 6,
+        "seed": 5,
+        "shape": "jagged",
+        "text_chunks": [
+          "なんだ",
+          "これ"
+        ],
+        "n_cols": 2,
+        "placement_mode": "slot",
+        "slot_index": 1,
+        "overlap_face": false,
+        "size_scale": 1.0,
+        "occupancy": "ink",
+        "occupancy_mode": "color_fill"
+      }
+    },
+    {
+      "id": "bub_l6",
+      "line_id": "l6",
+      "text": "見慣れぬ　アイコン・・・",
+      "tone": "normal",
+      "order": 6,
+      "bubble_bbox": [
+        314.08,
+        1317.49,
+        476.48,
+        1569.49
+      ],
+      "speaker_face_id": null,
+      "speaker_face_bbox": null,
+      "frame_id": "f1",
+      "score": 8.0,
+      "meta": {
+        "tone_source": "explicit",
+        "char_count": 12,
+        "seed": 6,
+        "shape": "ellipse",
+        "text_chunks": [
+          "見慣れぬ",
+          "アイコン・・・"
+        ],
+        "n_cols": 2,
+        "placement_mode": "center",
+        "slot_index": 0,
+        "overlap_face": false,
+        "size_scale": 1.0,
+        "occupancy": "ink",
+        "occupancy_mode": "color_fill"
+      }
+    },
+    {
+      "id": "bub_l7",
+      "line_id": "l7",
+      "text": "※ロゴは実際のものと異なります",
+      "tone": "narration",
+      "order": 7,
+      "bubble_bbox": [
+        133.96,
+        820.66,
+        205.96,
+        1200.16
+      ],
+      "speaker_face_id": null,
+      "speaker_face_bbox": null,
+      "frame_id": null,
+      "score": 1.0,
+      "meta": {
+        "tone_source": "explicit",
+        "char_count": 15,
+        "seed": 7,
+        "shape": "v-rect",
+        "placement": "page_margin"
+      }
+    }
+  ],
+  "options": {
+    "style": "default",
+    "seed": 0
+  },
+  "meta": {
+    "frames_reading_order": [
+      "f2",
+      "f3",
+      "f0",
+      "f1"
+    ]
+  }
+}

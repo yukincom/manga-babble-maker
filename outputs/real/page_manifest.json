@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "status": "ok",
+  "page": {
+    "image_path": "samples/real/page.jpg",
+    "width": 1306,
+    "height": 1843
+  },
+  "files": {
+    "art": "samples/real/page.jpg",
+    "bubble_layer": "outputs/real/page_bubble.png",
+    "text_layer": "outputs/real/page_text.png",
+    "layout_json": "outputs/real/page_layout.json",
+    "preview": "outputs/real/page_preview.png"
+  },
+  "bubbles": [
+    {
+      "id": "bub_l0",
+      "line_id": "l0",
+      "text": "2025年",
+      "tone": "narration",
+      "order": 0,
+      "bubble_bbox": [
+        474.87,
+        154.52,
+        558.87,
+        350.52
+      ],
+      "speaker_face_bbox": null
+    },
+    {
+      "id": "bub_l1",
+      "line_id": "l1",
+      "text": "やっと　正月だー！",
+      "tone": "normal",
+      "order": 1,
+      "bubble_bbox": [
+        860.34,
+        154.52,
+        1022.74,
+        350.52
+      ],
+      "speaker_face_bbox": [
+        279.24,
+        262.39,
+        462.37,
+        431.63
+      ]
+    },
+    {
+      "id": "bub_l2",
+      "line_id": "l2",
+      "text": "たまには　ツイッター…",
+      "tone": "normal",
+      "order": 2,
+      "bubble_bbox": [
+        723.15,
+        624.74,
+        885.55,
+        848.74
+      ],
+      "speaker_face_bbox": [
+        892.84,
+        772.77,
+        995.04,
+        863.68
+      ]
+    },
+    {
+      "id": "bub_l3",
+      "line_id": "l3",
+      "text": "今は　Xだっけ",
+      "tone": "normal",
+      "order": 3,
+      "bubble_bbox": [
+        565.61,
+        624.74,
+        705.61,
+        792.74
+      ],
+      "speaker_face_bbox": null
+    },
+    {
+      "id": "bub_l4",
+      "line_id": "l4",
+      "text": "ん？",
+      "tone": "normal",
+      "order": 4,
+      "bubble_bbox": [
+        428.78,
+        1211.58,
+        531.82,
+        1323.58
+      ],
+      "speaker_face_bbox": [
+        635.76,
+        1197.73,
+        1051.72,
+        1631.72
+      ]
+    },
+    {
+      "id": "bub_l5",
+      "line_id": "l5",
+      "text": "なんだ　これ",
+      "tone": "shout",
+      "order": 5,
+      "bubble_bbox": [
+        405.0,
+        1083.09,
+        593.16,
+        1279.09
+      ],
+      "speaker_face_bbox": null
+    },
+    {
+      "id": "bub_l6",
+      "line_id": "l6",
+      "text": "見慣れぬ　アイコン・・・",
+      "tone": "normal",
+      "order": 6,
+      "bubble_bbox": [
+        154.75,
+        1179.76,
+        317.15,
+        1431.76
+      ],
+      "speaker_face_bbox": null
+    },
+    {
+      "id": "bub_l7",
+      "line_id": "l7",
+      "text": "※ロゴは実際のものと異なります",
+      "tone": "narration",
+      "order": 7,
+      "bubble_bbox": [
+        35.86,
+        684.63,
+        107.86,
+        1037.87
+      ],
+      "speaker_face_bbox": null
+    }
+  ],
+  "errors": []
+}
